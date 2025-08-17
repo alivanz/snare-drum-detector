@@ -1,0 +1,30 @@
+@import "tailwindcss" source(".");
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif,
+    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+}
+
+html,
+body {
+  @apply bg-gray-900 text-white;
+  color-scheme: dark;
+}
+
+* {
+  @apply border-gray-700;
+}
+
+.snare-glow {
+  box-shadow: 0 0 20px rgba(239, 68, 68, 0.5);
+}
+
+.hit-animation {
+  animation: hitPulse 0.2s ease-out;
+}
+
+@keyframes hitPulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
+}
