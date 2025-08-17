@@ -29,31 +29,25 @@ export default function Game() {
 				</div>
 
 				<div className="mb-8">
-					<div className="w-80 h-80 mx-auto bg-gradient-to-br from-red-600 to-red-800 rounded-full border-8 border-red-500 snare-glow flex items-center justify-center cursor-pointer hover:scale-105 transition-transform duration-100">
+					<div className="w-80 h-80 mx-auto bg-gradient-to-br from-red-600 to-red-800 rounded-full border-8 border-red-500 snare-glow flex items-center justify-center">
 						<span className="text-8xl">🥁</span>
 					</div>
 					<p className="text-gray-400 mt-4 text-lg">
-						Click the drum to hit it!
+						Waiting for drum hits...
 					</p>
 				</div>
 
 				<div className="space-y-4">
 					<div className="text-gray-500 text-lg">
-						Ready to start? Click the drum when you're ready!
+						Game ready! Hit your physical snare drum to start scoring!
 					</div>
 
-					<div className="flex justify-center space-x-4">
+					<div className="flex justify-center">
 						<Link
 							to="/"
 							className="bg-gray-600 hover:bg-gray-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200"
 						>
-							Back to Home
-						</Link>
-						<Link
-							to="/score"
-							className="bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200"
-						>
-							Finish Game
+							Cancel Game
 						</Link>
 					</div>
 				</div>
@@ -62,7 +56,7 @@ export default function Game() {
 			<div className="fixed bottom-4 right-4 bg-gray-800 p-4 rounded-lg border border-gray-700">
 				<div className="text-gray-400 text-sm">
 					<div>
-						Click Rate: <span className="text-white">0.0 hits/sec</span>
+						Hit Rate: <span className="text-white">0.0 hits/sec</span>
 					</div>
 					<div>
 						Best Combo: <span className="text-yellow-400">0</span>

@@ -68,9 +68,6 @@ export default function Score() {
 					</div>
 				</div>
 
-				<div className="mt-8 text-gray-500 text-sm">
-					<p>Think you can do better? Challenge your friends!</p>
-				</div>
 			</div>
 		</div>
 	);

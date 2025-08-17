@@ -42,7 +42,7 @@ export default function Home() {
 					</ul>
 				</div>
 
-				<div className="space-y-4">
+				<div className="space-y-6">
 					<Link
 						to="/game"
 						className="inline-block bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-colors duration-200"
@@ -50,12 +50,19 @@ export default function Home() {
 						START CHALLENGE
 					</Link>
 
-					<div className="flex justify-center space-x-4">
+					<Link
+						to="/leaderboard"
+						className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg text-lg transition-colors duration-200"
+					>
+						🏆 View Leaderboard
+					</Link>
+
+					<div className="flex justify-center">
 						<Link
-							to="/leaderboard"
-							className="text-gray-400 hover:text-white underline"
+							to="/settings"
+							className="text-gray-400 hover:text-white underline text-sm"
 						>
-							View Leaderboard
+							⚙️ Settings
 						</Link>
 					</div>
 				</div>
