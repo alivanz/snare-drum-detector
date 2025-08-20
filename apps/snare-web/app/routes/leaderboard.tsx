@@ -1,5 +1,5 @@
-import { Link } from "react-router";
 import type { Route } from "./+types/leaderboard";
+import { Layout } from "./layout";
 
 export function meta({}: Route.MetaArgs) {
 	return [
@@ -60,20 +60,20 @@ export default function Leaderboard() {
 	};
 
 	return (
-		<div className="min-h-screen bg-gray-900 p-4">
-			<div className="max-w-4xl mx-auto">
-				<div className="text-center mb-8">
+		<Layout currentPage="leaderboard">
+			<div className="max-w-6xl mx-auto">
+				<div className="mb-8">
 					<h1 className="text-4xl font-bold text-white mb-4">
 						🏆 Hall of Fame
 					</h1>
-					<p className="text-xl text-gray-300">
+					<p className="text-xl text-zinc-300">
 						Top 10 Snare Drum Challenge Champions
 					</p>
 				</div>
 
 
-				<div className="bg-gray-800 rounded-lg border border-gray-700 overflow-hidden mb-8">
-					<div className="bg-gray-700 px-6 py-4 border-b border-gray-600">
+				<div className="flat-card overflow-hidden">
+					<div className="bg-zinc-800 px-6 py-4 border-b border-zinc-700">
 						<h2 className="text-xl font-semibold text-white">
 							Leaderboard
 						</h2>
@@ -81,20 +81,20 @@ export default function Leaderboard() {
 
 					<div className="overflow-x-auto">
 						<table className="w-full">
-							<thead className="bg-gray-750 sticky top-0 z-10">
-								<tr className="text-gray-300 text-sm">
-									<th className="text-left py-3 px-6 font-semibold">Rank</th>
-									<th className="text-left py-3 px-6 font-semibold">Player</th>
-									<th className="text-center py-3 px-6 font-semibold">Score</th>
-									<th className="text-center py-3 px-6 font-semibold">Date</th>
+							<thead className="bg-zinc-800 sticky top-0 z-10">
+								<tr className="text-zinc-300 text-sm">
+									<th className="text-left py-4 px-6 font-semibold">Rank</th>
+									<th className="text-left py-4 px-6 font-semibold">Player</th>
+									<th className="text-center py-4 px-6 font-semibold">Score</th>
+									<th className="text-center py-4 px-6 font-semibold">Date</th>
 								</tr>
 							</thead>
 							<tbody>
 								{currentLeaderboard.map((entry, index) => (
 									<tr
 										key={entry.rank}
-										className={`border-b border-gray-700 hover:bg-gray-750 transition-colors ${
-											index < 3 ? "bg-gray-750" : ""
+										className={`border-b border-zinc-800 hover:bg-zinc-800 transition-colors ${
+											index < 3 ? "bg-zinc-850" : ""
 										}`}
 									>
 										<td className="py-4 px-6">
@@ -104,7 +104,7 @@ export default function Leaderboard() {
 														entry.rank === 1
 															? "text-yellow-400"
 															: entry.rank === 2
-																? "text-gray-400"
+																? "text-zinc-400"
 																: entry.rank === 3
 																	? "text-orange-600"
 																	: ""
@@ -120,7 +120,7 @@ export default function Leaderboard() {
 												</span>
 												<span
 													className={`font-bold ${
-														entry.rank <= 3 ? "text-white" : "text-gray-300"
+														entry.rank <= 3 ? "text-white" : "text-zinc-300"
 													}`}
 												>
 													#{entry.rank}
@@ -129,7 +129,7 @@ export default function Leaderboard() {
 										</td>
 										<td
 											className={`py-4 px-6 font-semibold ${
-												entry.rank <= 3 ? "text-white" : "text-gray-300"
+												entry.rank <= 3 ? "text-white" : "text-zinc-300"
 											}`}
 										>
 											{entry.name}
@@ -139,7 +139,7 @@ export default function Leaderboard() {
 												entry.rank === 1
 													? "text-yellow-400"
 													: entry.rank === 2
-														? "text-gray-300"
+														? "text-zinc-300"
 														: entry.rank === 3
 															? "text-orange-600"
 															: "text-green-400"
@@ -147,7 +147,7 @@ export default function Leaderboard() {
 										>
 											{entry.score}
 										</td>
-										<td className="py-4 px-6 text-center text-gray-400 text-sm">
+										<td className="py-4 px-6 text-center text-zinc-400 text-sm">
 											{entry.date}
 										</td>
 									</tr>
@@ -156,30 +156,7 @@ export default function Leaderboard() {
 						</table>
 					</div>
 				</div>
-
-				<div className="text-center space-y-4">
-					<div className="bg-gray-800 rounded-lg p-6 border border-gray-700">
-						<h3 className="text-lg font-semibold text-white mb-2">
-							Think you can make it to the top?
-						</h3>
-						<p className="text-gray-400 mb-4">
-							Challenge yourself and climb the leaderboard!
-						</p>
-						<Link
-							to="/"
-							className="inline-block bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-lg transition-colors duration-200"
-						>
-							Start New Challenge
-						</Link>
-					</div>
-
-					<div className="flex justify-center">
-						<Link to="/" className="text-gray-400 hover:text-white underline">
-							← Back to Home
-						</Link>
-					</div>
-				</div>
 			</div>
-		</div>
+		</Layout>
 	);
 }

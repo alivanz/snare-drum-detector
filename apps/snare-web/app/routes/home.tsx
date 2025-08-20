@@ -1,5 +1,5 @@
-import { Link } from "react-router";
 import type { Route } from "./+types/home";
+import { Layout } from "./layout";
 
 export function meta({}: Route.MetaArgs) {
 	return [
@@ -14,59 +14,43 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Home() {
 	return (
-		<div className="min-h-screen bg-gray-900 flex items-center justify-center p-4">
-			<div className="max-w-2xl mx-auto text-center">
-				<div className="mb-8">
+		<Layout currentPage="home">
+			<div className="max-w-4xl mx-auto">
+				<div className="mb-12">
 					<h1 className="text-6xl font-bold text-white mb-4">
 						🥁 Snare Drum Challenge
 					</h1>
-					<p className="text-xl text-gray-300 mb-8">
+					<p className="text-xl text-zinc-300 mb-8">
 						Test your rhythm skills! Hit the snare drum as many times as you can
 						in 30 seconds.
 					</p>
 				</div>
 
-				<div className="bg-gray-800 rounded-lg p-8 mb-8 border border-gray-700">
-					<div className="w-48 h-48 mx-auto mb-6 bg-gradient-to-br from-red-600 to-red-800 rounded-full border-4 border-red-500 snare-glow flex items-center justify-center">
+				<div className="flat-card p-8 mb-8">
+					<div className="w-48 h-48 mx-auto mb-6 bg-red-600 flex items-center justify-center">
 						<span className="text-4xl">🥁</span>
 					</div>
 
-					<h2 className="text-2xl font-semibold text-white mb-4">
+					<h2 className="text-2xl font-semibold text-white mb-6">
 						How to Play
 					</h2>
-					<ul className="text-gray-300 space-y-2 text-left max-w-md mx-auto">
+					<ul className="text-zinc-300 space-y-3 text-left max-w-lg mx-auto text-lg">
 						<li>• Click the START button to begin</li>
-						<li>• Hit the snare drum as fast as you can</li>
+						<li>• Hit the physical snare drum as fast as you can</li>
 						<li>• You have 30 seconds to get the highest score</li>
 						<li>• Enter your name for the leaderboard</li>
+						<li>• Select your city to compete locally</li>
 					</ul>
 				</div>
 
-				<div className="space-y-6">
-					<Link
-						to="/game"
-						className="inline-block bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-8 rounded-lg text-xl transition-colors duration-200"
-					>
-						START CHALLENGE
-					</Link>
-
-					<Link
-						to="/leaderboard"
-						className="inline-block bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-6 rounded-lg text-lg transition-colors duration-200"
-					>
-						🏆 View Leaderboard
-					</Link>
-
-					<div className="flex justify-center">
-						<Link
-							to="/settings"
-							className="text-gray-400 hover:text-white underline text-sm"
-						>
-							⚙️ Settings
-						</Link>
-					</div>
+				<div className="flat-card p-6">
+					<h3 className="text-xl font-semibold text-white mb-4">Ready to Start?</h3>
+					<p className="text-zinc-400">
+						Use the START CHALLENGE button in the menu to begin your drum challenge.
+						Make sure you've selected your city in Settings first!
+					</p>
 				</div>
 			</div>
-		</div>
+		</Layout>
 	);
 }
