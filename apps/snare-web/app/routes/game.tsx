@@ -135,28 +135,34 @@ export default function Game() {
 		};
 	}, []); // Empty dependency array - connect once on mount
 
-	// Start countdown when component mounts
+	// Start countdown when game status changes to countdown
 	useEffect(() => {
-		countdownTimerRef.current = window.setInterval(() => {
-			setCountdown((prev) => {
-				if (prev <= 1) {
-					// Start the game
-					if (countdownTimerRef.current) {
-						clearInterval(countdownTimerRef.current);
+		if (gameStatus === "countdown") {
+			// Reset countdown to initial value
+			setCountdown(COUNTDOWN_DURATION);
+
+			countdownTimerRef.current = window.setInterval(() => {
+				setCountdown((prev) => {
+					if (prev <= 1) {
+						// Start the game
+						if (countdownTimerRef.current) {
+							clearInterval(countdownTimerRef.current);
+						}
+						setGameStatus("playing");
+						return 0;
 					}
-					setGameStatus("playing");
-					return 0;
-				}
-				return prev - 1;
-			});
-		}, 1000);
+					return prev - 1;
+				});
+			}, 1000);
+		}
 
 		return () => {
 			if (countdownTimerRef.current) {
 				clearInterval(countdownTimerRef.current);
+				countdownTimerRef.current = null;
 			}
 		};
-	}, []);
+	}, [gameStatus]);
 
 	// Update gameStatusRef when gameStatus changes
 	useEffect(() => {
@@ -221,15 +227,15 @@ export default function Game() {
 
 	const playAgain = () => {
 		// Reset all state
-		setGameStatus("countdown");
 		setScore(0);
-		setCountdown(COUNTDOWN_DURATION);
 		setTimeRemaining(GAME_DURATION);
 		setHitRate(0);
 		setBestCombo(0);
 		setCurrentCombo(0);
 		hitTimestampsRef.current = [];
 		lastHitTimeRef.current = 0;
+		// Set game status to countdown last - this will trigger the countdown timer
+		setGameStatus("countdown");
 	};
 
 	return (
