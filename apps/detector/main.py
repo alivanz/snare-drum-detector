@@ -12,7 +12,7 @@ from typing import Set, Optional, Dict, Any
 # Parameters
 THRESHOLD = 0.2       # Adjust based on your mic sensitivity
 BLOCK_DURATION = 0.05 # 50 ms blocks
-RATE = 44100
+RATE = 48000
 CHANNELS = 1
 
 q = queue.Queue()
