@@ -10,8 +10,9 @@
 		"postinstall": "npm run cf-typegen",
 		"preview": "pnpm run build && vite preview",
 		"typecheck": "npm run cf-typegen && react-router typegen && tsc -b",
-		"format": "biome check --write .",
-		"lint": "biome lint --write ."
+		"format": "biome check --write workers/ app/routes/",
+		"format:all": "biome check --write .",
+		"lint": "biome lint --write workers/ app/routes/"
 	},
 	"dependencies": {
 		"@types/uuid": "^10.0.0",

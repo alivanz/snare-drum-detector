@@ -12,5 +12,15 @@
 				"useImportType": "warn"
 			}
 		}
+	},
+	"files": {
+		"experimentalScannerIgnores": [
+			".react-router/**",
+			"node_modules/**",
+			"build/**",
+			"dist/**",
+			"**/*.css",
+			"app/welcome/**"
+		]
 	}
 }
