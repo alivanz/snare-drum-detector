@@ -62,10 +62,32 @@ export class ScoreStorage extends DurableObject<Env> {
 			.orderBy(desc(scores.score));
 	}
 
+	async getHighestScore(locationId: string): Promise<number | null> {
+		const result = await this.db
+			.select({ maxScore: sql<number>`MAX(${scores.score})` })
+			.from(scores)
+			.where(eq(scores.locationId, locationId));
+		
+		return result[0]?.maxScore ?? null;
+	}
+
 	async getSettings(): Promise<Settings | null> {
 		const [result] = await this.db
 			.select()
 			.from(settings)
+			.where(eq(settings.id, "default"));
+
+		return result || null;
+	}
+
+	async getSettingsWithLocation(): Promise<{ settings: Settings; location: Location } | null> {
+		const [result] = await this.db
+			.select({
+				settings: settings,
+				location: locations,
+			})
+			.from(settings)
+			.innerJoin(locations, eq(settings.locationId, locations.id))
 			.where(eq(settings.id, "default"));
 
 		return result || null;

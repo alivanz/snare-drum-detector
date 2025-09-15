@@ -1,5 +1,5 @@
+import { Link, redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/leaderboard";
-import { Layout } from "./layout";
 
 export function meta({}: Route.MetaArgs) {
 	return [
@@ -11,103 +11,91 @@ export function meta({}: Route.MetaArgs) {
 	];
 }
 
-const mockLeaderboards = {
-	jakarta: [
-		{ rank: 1, name: "JakartaDrummer", score: 342, date: "2024-08-15" },
-		{ rank: 2, name: "CapitalBeats", score: 328, date: "2024-08-14" },
-		{ rank: 3, name: "MetroRhythm", score: 315, date: "2024-08-16" },
-		{ rank: 4, name: "CitySnare", score: 298, date: "2024-08-13" },
-		{ rank: 5, name: "JKTMaster", score: 284, date: "2024-08-15" },
-		{ rank: 6, name: "TowerBeats", score: 271, date: "2024-08-12" },
-		{ rank: 7, name: "MegaHits", score: 267, date: "2024-08-17" },
-		{ rank: 8, name: "UrbanDrum", score: 255, date: "2024-08-11" },
-		{ rank: 9, name: "JKTRhythm", score: 248, date: "2024-08-16" },
-		{ rank: 10, name: "CapitalHits", score: 241, date: "2024-08-10" },
-	],
-	surabaya: [
-		{ rank: 1, name: "SurabayaStick", score: 334, date: "2024-08-15" },
-		{ rank: 2, name: "EastJavaBeats", score: 321, date: "2024-08-14" },
-		{ rank: 3, name: "SBYDrummer", score: 308, date: "2024-08-16" },
-		{ rank: 4, name: "HeroesHits", score: 295, date: "2024-08-13" },
-		{ rank: 5, name: "PortRhythm", score: 282, date: "2024-08-15" },
-		{ rank: 6, name: "SuraBeats", score: 269, date: "2024-08-12" },
-		{ rank: 7, name: "EastPower", score: 256, date: "2024-08-17" },
-		{ rank: 8, name: "BayaHits", score: 243, date: "2024-08-11" },
-		{ rank: 9, name: "SBYMaster", score: 230, date: "2024-08-16" },
-		{ rank: 10, name: "HeroSnare", score: 225, date: "2024-08-10" },
-	],
-	bandung: [
-		{ rank: 1, name: "BandungBeats", score: 329, date: "2024-08-15" },
-		{ rank: 2, name: "ParisVanJava", score: 316, date: "2024-08-14" },
-		{ rank: 3, name: "MountainHits", score: 303, date: "2024-08-16" },
-		{ rank: 4, name: "BDGDrummer", score: 290, date: "2024-08-13" },
-		{ rank: 5, name: "CoolCity", score: 277, date: "2024-08-15" },
-		{ rank: 6, name: "WestJavaBeats", score: 264, date: "2024-08-12" },
-		{ rank: 7, name: "BandungStick", score: 251, date: "2024-08-17" },
-		{ rank: 8, name: "FlowerSnare", score: 238, date: "2024-08-11" },
-		{ rank: 9, name: "BDGRhythm", score: 225, date: "2024-08-16" },
-		{ rank: 10, name: "ParisHits", score: 220, date: "2024-08-10" },
-	],
-};
+export async function loader({ context }: Route.LoaderArgs) {
+	const scoreStorage = context.cloudflare.env.SCORE_STORAGE;
+	const id = scoreStorage.idFromName("global");
+	const stub = scoreStorage.get(id);
+	
+	// Get current settings with location
+	const settingsWithLocation = await stub.getSettingsWithLocation();
+	
+	// If no location is set, redirect to settings
+	if (!settingsWithLocation) {
+		return redirect("/settings");
+	}
+	
+	// Get scores for the current location (already sorted by score DESC from the Durable Object)
+	const scores = await stub.getScoresByLocation(settingsWithLocation.settings.locationId);
+	
+	// Add rank to each score
+	const rankedScores = scores.map((score, index) => ({
+		rank: index + 1,
+		score: score.score,
+		combo: score.combo,
+		duration: score.duration,
+		timestamp: score.timestamp,
+	}));
+	
+	return {
+		scores: rankedScores,
+		locationName: settingsWithLocation.location.name,
+	};
+}
 
 export default function Leaderboard() {
-	const currentCity = "jakarta";
-	const currentLeaderboard =
-		mockLeaderboards[currentCity] || mockLeaderboards.jakarta;
-	const cityNames = {
-		jakarta: "Jakarta",
-		surabaya: "Surabaya",
-		bandung: "Bandung",
-	};
+	const { scores, locationName } = useLoaderData<typeof loader>();
 
 	return (
-		<Layout currentPage="leaderboard">
-			<div className="max-w-6xl mx-auto">
-				<div className="mb-8">
-					<h1 className="text-4xl font-bold text-white mb-4">
-						🏆 Hall of Fame
-					</h1>
-					<p className="text-xl text-zinc-300">
-						Top 10 Snare Drum Challenge Champions
-					</p>
-				</div>
+		<div
+			className="min-h-screen flex flex-col items-center justify-center p-4"
+			style={{
+				backgroundImage: "url(/background.jpg)",
+				backgroundSize: "cover",
+				backgroundPosition: "center",
+				backgroundRepeat: "no-repeat",
+			}}
+		>
+			<div className="bg-black/60 backdrop-blur-sm rounded-lg p-12 border-2 border-white/30 max-w-4xl w-full">
+				<h1 className="text-3xl text-white uppercase tracking-widest mb-2 text-center font-bold">
+					LEADERBOARD
+				</h1>
+				<p className="text-xl text-white/60 uppercase tracking-wider mb-8 text-center">
+					{locationName}
+				</p>
 
-				<div className="flat-card overflow-hidden">
-					<div className="bg-zinc-800 px-6 py-4 border-b border-zinc-700">
-						<h2 className="text-xl font-semibold text-white">Leaderboard</h2>
+				{scores.length === 0 ? (
+					<div className="text-center py-12">
+						<p className="text-white/60 text-xl">No scores yet!</p>
+						<p className="text-white/40 mt-2">Be the first to set a record!</p>
 					</div>
-
+				) : (
 					<div className="overflow-x-auto">
-						<table className="w-full">
-							<thead className="bg-zinc-800 sticky top-0 z-10">
-								<tr className="text-zinc-300 text-sm">
-									<th className="text-left py-4 px-6 font-semibold">Rank</th>
-									<th className="text-left py-4 px-6 font-semibold">Player</th>
-									<th className="text-center py-4 px-6 font-semibold">Score</th>
-									<th className="text-center py-4 px-6 font-semibold">Date</th>
+						<table className="w-full text-white">
+							<thead>
+								<tr className="border-b border-white/30">
+									<th className="text-left py-3 px-4 uppercase tracking-wider text-sm text-white/80">
+										Rank
+									</th>
+									<th className="text-center py-3 px-4 uppercase tracking-wider text-sm text-white/80">
+										Score
+									</th>
+									<th className="text-center py-3 px-4 uppercase tracking-wider text-sm text-white/80">
+										Combo
+									</th>
+									<th className="text-center py-3 px-4 uppercase tracking-wider text-sm text-white/80">
+										Date
+									</th>
 								</tr>
 							</thead>
 							<tbody>
-								{currentLeaderboard.map((entry, index) => (
+								{scores.map((entry, index) => (
 									<tr
 										key={entry.rank}
-										className={`border-b border-zinc-800 hover:bg-zinc-800 transition-colors ${
-											index < 3 ? "bg-zinc-850" : ""
-										}`}
+										className="border-b border-white/10 hover:bg-white/5 transition-colors"
 									>
-										<td className="py-4 px-6">
+										<td className="py-3 px-4">
 											<div className="flex items-center">
-												<span
-													className={`text-2xl mr-3 ${
-														entry.rank === 1
-															? "text-yellow-400"
-															: entry.rank === 2
-																? "text-zinc-400"
-																: entry.rank === 3
-																	? "text-orange-600"
-																	: ""
-													}`}
-												>
+												<span className="text-2xl mr-3">
 													{entry.rank === 1
 														? "🥇"
 														: entry.rank === 2
@@ -116,45 +104,47 @@ export default function Leaderboard() {
 																? "🥉"
 																: ""}
 												</span>
-												<span
-													className={`font-bold ${
-														entry.rank <= 3 ? "text-white" : "text-zinc-300"
-													}`}
-												>
+												<span className={`font-bold ${
+													entry.rank <= 3 ? "text-white" : "text-white/60"
+												}`}>
 													#{entry.rank}
 												</span>
 											</div>
 										</td>
-										<td
-											className={`py-4 px-6 font-semibold ${
-												entry.rank <= 3 ? "text-white" : "text-zinc-300"
-											}`}
-										>
-											{entry.name}
+										<td className={`py-3 px-4 text-center font-mono text-2xl ${
+											entry.rank === 1
+												? "text-yellow-400"
+												: entry.rank === 2
+													? "text-gray-300"
+													: entry.rank === 3
+														? "text-orange-600"
+														: "text-white"
+										}`}>
+											{entry.score.toLocaleString()}
 										</td>
-										<td
-											className={`py-4 px-6 text-center font-mono text-lg ${
-												entry.rank === 1
-													? "text-yellow-400"
-													: entry.rank === 2
-														? "text-zinc-300"
-														: entry.rank === 3
-															? "text-orange-600"
-															: "text-green-400"
-											}`}
-										>
-											{entry.score}
+										<td className="py-3 px-4 text-center text-white/60">
+											{entry.combo}
 										</td>
-										<td className="py-4 px-6 text-center text-zinc-400 text-sm">
-											{entry.date}
+										<td className="py-3 px-4 text-center text-white/40 text-sm">
+											{new Date(entry.timestamp).toLocaleDateString()}
 										</td>
 									</tr>
 								))}
 							</tbody>
 						</table>
 					</div>
-				</div>
+				)}
 			</div>
-		</Layout>
+
+			{/* Back to Home */}
+			<div className="mt-8">
+				<Link 
+					to="/" 
+					className="text-white text-lg uppercase tracking-wider hover:text-white/80 transition-colors underline"
+				>
+					Back to Home
+				</Link>
+			</div>
+		</div>
 	);
 }

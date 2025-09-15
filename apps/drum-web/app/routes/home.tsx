@@ -1,4 +1,4 @@
-import { Link } from "react-router";
+import { Link, redirect, useLoaderData } from "react-router";
 import type { Route } from "./+types/home";
 
 export function meta({}: Route.MetaArgs) {
@@ -12,7 +12,31 @@ export function meta({}: Route.MetaArgs) {
 	];
 }
 
+export async function loader({ context }: Route.LoaderArgs) {
+	const scoreStorage = context.cloudflare.env.SCORE_STORAGE;
+	const id = scoreStorage.idFromName("global");
+	const stub = scoreStorage.get(id);
+
+	// Get current settings
+	const currentSettings = await stub.getSettings();
+
+	// If no settings is set, redirect to settings
+	if (!currentSettings) {
+		return redirect("/settings");
+	}
+
+	// Get the highest score for the current location
+	const maxScore = await stub.getHighestScore(currentSettings.locationId);
+
+	return {
+		maxScore,
+		locationId: currentSettings.locationId,
+	};
+}
+
 export default function Home() {
+	const { maxScore } = useLoaderData<typeof loader>();
+
 	return (
 		<div
 			className="min-h-screen flex flex-col items-center justify-center p-4"
@@ -28,7 +52,9 @@ export default function Home() {
 				<h1 className="text-2xl text-white/80 uppercase tracking-widest mb-6 text-center">
 					ALL TIME RECORD
 				</h1>
-				<div className="text-8xl font-bold text-white text-center">2.487</div>
+				<div className="text-8xl font-bold text-white text-center">
+					{maxScore !== null ? maxScore.toLocaleString() : "---"}
+				</div>
 			</div>
 
 			{/* Start Challenge Button */}

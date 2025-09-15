@@ -1,12 +1,65 @@
-import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
+import { parseWithZod } from "@conform-to/zod/v4";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, redirect, useFetcher } from "react-router";
+import { z } from "zod";
 import type { Route } from "./+types/game";
+
+const scoreSchema = z.object({
+	score: z.coerce.number().min(0),
+	combo: z.coerce.number().min(0),
+	duration: z.coerce.number().min(0),
+});
 
 export function meta({}: Route.MetaArgs) {
 	return [
 		{ title: "Game - Snare Drum Challenge" },
 		{ name: "description", content: "Hit the snare drum as fast as you can!" },
 	];
+}
+
+export async function loader({ context }: Route.LoaderArgs) {
+	const scoreStorage = context.cloudflare.env.SCORE_STORAGE;
+	const id = scoreStorage.idFromName("global");
+	const stub = scoreStorage.get(id);
+
+	// Get current settings to ensure location is set
+	const currentSettings = await stub.getSettings();
+
+	if (!currentSettings || !currentSettings.locationId) {
+		return redirect("/settings");
+	}
+
+	return { locationId: currentSettings.locationId };
+}
+
+export async function action({ request, context }: Route.ActionArgs) {
+	const formData = await request.formData();
+	const submission = parseWithZod(formData, { schema: scoreSchema });
+
+	if (submission.status !== "success") {
+		return submission.reply({ formErrors: ["Invalid score data"] });
+	}
+
+	const scoreStorage = context.cloudflare.env.SCORE_STORAGE;
+	const id = scoreStorage.idFromName("global");
+	const stub = scoreStorage.get(id);
+
+	// Get current settings for location
+	const currentSettings = await stub.getSettings();
+
+	if (!currentSettings || !currentSettings.locationId) {
+		return submission.reply({ formErrors: ["No location set"] });
+	}
+
+	// Add the score
+	await stub.addScore({
+		locationId: currentSettings.locationId,
+		score: submission.value.score,
+		combo: submission.value.combo,
+		duration: submission.value.duration * 1000, // Convert to milliseconds
+	});
+
+	return submission.reply({ resetForm: true });
 }
 
 type GameStatus = "countdown" | "playing" | "ended";
@@ -40,23 +93,26 @@ export default function Game() {
 	const [isConnected, setIsConnected] = useState(false);
 	const [connectionError, setConnectionError] = useState<string | null>(null);
 	const [drumAnimation, setDrumAnimation] = useState(false);
+	const [scoreSubmitted, setScoreSubmitted] = useState(false);
 
+	const fetcher = useFetcher();
 	const wsRef = useRef<WebSocket | null>(null);
 	const gameTimerRef = useRef<number | null>(null);
 	const countdownTimerRef = useRef<number | null>(null);
 	const lastHitTimeRef = useRef<number>(0);
 	const hitTimestampsRef = useRef<number[]>([]);
 	const gameStatusRef = useRef<GameStatus>("countdown");
+	const gameStartTimeRef = useRef<number>(0);
 
 	// Calculate hit rate based on recent hits
-	const calculateHitRate = () => {
+	const calculateHitRate = useCallback(() => {
 		const now = Date.now();
 		const recentHits = hitTimestampsRef.current.filter(
 			(timestamp) => now - timestamp < 5000, // Last 5 seconds
 		);
 		const rate = recentHits.length / 5;
 		setHitRate(Math.round(rate * 10) / 10);
-	};
+	}, []);
 
 	// Handle WebSocket connection - connect once when component mounts
 	useEffect(() => {
@@ -148,6 +204,7 @@ export default function Game() {
 						if (countdownTimerRef.current) {
 							clearInterval(countdownTimerRef.current);
 						}
+						gameStartTimeRef.current = Date.now(); // Record game start time
 						setGameStatus("playing");
 						return 0;
 					}
@@ -195,7 +252,22 @@ export default function Game() {
 				}
 			};
 		}
-	}, [gameStatus]);
+	}, [gameStatus, calculateHitRate]);
+
+	// Submit score when game ends
+	useEffect(() => {
+		if (gameStatus === "ended" && !scoreSubmitted && score > 0) {
+			const gameDuration = (Date.now() - gameStartTimeRef.current) / 1000; // Convert to seconds
+
+			const formData = new FormData();
+			formData.append("score", score.toString());
+			formData.append("combo", bestCombo.toString());
+			formData.append("duration", gameDuration.toString());
+
+			fetcher.submit(formData, { method: "post" });
+			setScoreSubmitted(true);
+		}
+	}, [gameStatus, score, bestCombo, scoreSubmitted, fetcher]);
 
 	// Cleanup on unmount
 	useEffect(() => {
@@ -232,6 +304,7 @@ export default function Game() {
 		setHitRate(0);
 		setBestCombo(0);
 		setCurrentCombo(0);
+		setScoreSubmitted(false);
 		hitTimestampsRef.current = [];
 		lastHitTimeRef.current = 0;
 		// Set game status to countdown last - this will trigger the countdown timer
