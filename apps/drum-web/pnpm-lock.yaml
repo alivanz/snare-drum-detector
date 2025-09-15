@@ -8,9 +8,18 @@ importers:
 
   .:
     dependencies:
+      '@conform-to/react':
+        specifier: ^1.10.0
+        version: 1.10.0(react@19.1.1)
+      '@conform-to/zod':
+        specifier: ^1.10.0
+        version: 1.10.0(zod@4.1.8)
       '@types/uuid':
         specifier: ^10.0.0
         version: 10.0.0
+      change-case:
+        specifier: ^5.4.4
+        version: 5.4.4
       drizzle-kit:
         specifier: ^0.31.4
         version: 0.31.4
@@ -32,6 +41,9 @@ importers:
       uuid:
         specifier: ^13.0.0
         version: 13.0.0
+      zod:
+        specifier: ^4.1.8
+        version: 4.1.8
     devDependencies:
       '@biomejs/biome':
         specifier: ^2.2.4
@@ -302,6 +314,19 @@ packages:
     engines: {node: '>=16'}
     cpu: [x64]
     os: [win32]
+
+  '@conform-to/dom@1.10.0':
+    resolution: {integrity: sha512-EGqKHVGMmyLp8I52srN6i55/4yqqthKUxMJCV7kf0BIahddS0fax//FkNk899M6brp3Y1rKAG7phapL6hvNCsg==}
+
+  '@conform-to/react@1.10.0':
+    resolution: {integrity: sha512-ScdnzvL02QnKLwPQRrpuG+wGkCX5FBYwPPnFlwjdo+8gWsQ0XnTmLVrCU/Y4IC17UIFaW7eqNeaHY5dSR28etw==}
+    peerDependencies:
+      react: '>=18'
+
+  '@conform-to/zod@1.10.0':
+    resolution: {integrity: sha512-1Wjj/CH5QZp61ZWrVyAaxFnCwYBwDU7FDifRQp4F1d0qFxbLIU5I8Zw1RFEpWjCxVdOj6IGZ+t+hptOzwwziXA==}
+    peerDependencies:
+      zod: ^3.21.0 || ^4.0.0
 
   '@cspotcode/source-map-support@0.8.1':
     resolution: {integrity: sha512-IchNf6dN4tHoMFIn/7OE8LWZ19Y6q/67Bmf6vnGREv8RSbBVb9LPJxEcnwrcwX6ixSvaiGoomAUvu4YSxXrVgw==}
@@ -1231,6 +1256,9 @@ packages:
   caniuse-lite@1.0.30001741:
     resolution: {integrity: sha512-QGUGitqsc8ARjLdgAfxETDhRbJ0REsP6O3I96TAth/mVjh2cYzN2u+3AzPP3aVSm2FehEItaJw1xd+IGBXWeSw==}
 
+  change-case@5.4.4:
+    resolution: {integrity: sha512-HRQyTk2/YPEkt9TnUPbOpr64Uw3KOicFWPVBb+xiHvd6eBx/qPr9xqfBFDT8P2vWsvvz4jbEkfDe71W3VyNu2w==}
+
   chokidar@4.0.3:
     resolution: {integrity: sha512-Qgzu8kfBvo+cA4962jnP1KkS6Dop5NS6g7R5LFYJr4b8Ub94PPQXUksCw9PvXoeXPRRddRNC5C1JQUR2SMGtnA==}
     engines: {node: '>= 14.16.0'}
@@ -2040,6 +2068,9 @@ packages:
   zod@3.22.3:
     resolution: {integrity: sha512-EjIevzuJRiRPbVH4mGc8nApb/lVLKVpmUhAaR5R5doKGfAnGJ6Gr3CViAVjP+4FWSxCsybeWQdcgCtbX+7oZug==}
 
+  zod@4.1.8:
+    resolution: {integrity: sha512-5R1P+WwQqmmMIEACyzSvo4JXHY5WiAFHRMg+zBZKgKS+Q1viRa0C1hmUKtHltoIFKtIdki3pRxkmpP74jnNYHQ==}
+
 snapshots:
 
   '@babel/code-frame@7.27.1':
@@ -2304,6 +2335,18 @@ snapshots:
 
   '@cloudflare/workerd-windows-64@1.20250906.0':
     optional: true
+
+  '@conform-to/dom@1.10.0': {}
+
+  '@conform-to/react@1.10.0(react@19.1.1)':
+    dependencies:
+      '@conform-to/dom': 1.10.0
+      react: 19.1.1
+
+  '@conform-to/zod@1.10.0(zod@4.1.8)':
+    dependencies:
+      '@conform-to/dom': 1.10.0
+      zod: 4.1.8
 
   '@cspotcode/source-map-support@0.8.1':
     dependencies:
@@ -2964,6 +3007,8 @@ snapshots:
   cac@6.7.14: {}
 
   caniuse-lite@1.0.30001741: {}
+
+  change-case@5.4.4: {}
 
   chokidar@4.0.3:
     dependencies:
@@ -3684,3 +3729,5 @@ snapshots:
       youch-core: 0.3.3
 
   zod@3.22.3: {}
+
+  zod@4.1.8: {}
