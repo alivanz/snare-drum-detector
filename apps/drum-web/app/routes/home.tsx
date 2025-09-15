@@ -1,5 +1,5 @@
+import { Link } from "react-router";
 import type { Route } from "./+types/home";
-import { Layout } from "./layout";
 
 export function meta({}: Route.MetaArgs) {
 	return [
@@ -14,43 +14,40 @@ export function meta({}: Route.MetaArgs) {
 
 export default function Home() {
 	return (
-		<Layout currentPage="home">
-			<div className="max-w-4xl mx-auto">
-				<div className="mb-12">
-					<h1 className="text-6xl font-bold text-white mb-4">
-						🥁 Snare Drum Challenge
-					</h1>
-					<p className="text-xl text-zinc-300 mb-8">
-						Test your rhythm skills! Hit the snare drum as many times as you can
-						in 30 seconds.
-					</p>
-				</div>
-
-				<div className="flat-card p-8 mb-8">
-					<div className="w-48 h-48 mx-auto mb-6 bg-red-600 flex items-center justify-center">
-						<span className="text-4xl">🥁</span>
-					</div>
-
-					<h2 className="text-2xl font-semibold text-white mb-6">
-						How to Play
-					</h2>
-					<ul className="text-zinc-300 space-y-3 text-left max-w-lg mx-auto text-lg">
-						<li>• Click the START button to begin</li>
-						<li>• Hit the physical snare drum as fast as you can</li>
-						<li>• You have 30 seconds to get the highest score</li>
-						<li>• Enter your name for the leaderboard</li>
-						<li>• Select your city to compete locally</li>
-					</ul>
-				</div>
-
-				<div className="flat-card p-6">
-					<h3 className="text-xl font-semibold text-white mb-4">Ready to Start?</h3>
-					<p className="text-zinc-400">
-						Use the START CHALLENGE button in the menu to begin your drum challenge.
-						Make sure you've selected your city in Settings first!
-					</p>
+		<div 
+			className="min-h-screen flex flex-col items-center justify-center p-4"
+			style={{
+				backgroundImage: 'url(/background.jpg)',
+				backgroundSize: 'cover',
+				backgroundPosition: 'center',
+				backgroundRepeat: 'no-repeat'
+			}}
+		>
+			{/* All Time Record Display */}
+			<div className="bg-black/60 backdrop-blur-sm rounded-lg p-12 border-2 border-white/30 mb-16">
+				<h1 className="text-2xl text-white/80 uppercase tracking-widest mb-6 text-center">
+					ALL TIME RECORD
+				</h1>
+				<div className="text-8xl font-bold text-white text-center">
+					2.487
 				</div>
 			</div>
-		</Layout>
+
+			{/* Start Challenge Button */}
+			<div 
+				className="px-16 py-6 rounded-lg cursor-pointer hover:scale-105 transition-transform"
+				style={{
+					background: 'linear-gradient(180deg, #E0E0E0 0%, #9E9E9E 50%, #757575 100%)',
+					boxShadow: '0 6px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+				}}
+			>
+				<Link 
+					to="/game" 
+					className="text-3xl font-bold text-black uppercase tracking-wider"
+				>
+					START CHALLENGE
+				</Link>
+			</div>
+		</div>
 	);
 }
