@@ -12,3 +12,10 @@ CREATE TABLE `scores` (
 	`duration` integer NOT NULL,
 	FOREIGN KEY (`location_id`) REFERENCES `locations`(`id`) ON UPDATE no action ON DELETE no action
 );
+--> statement-breakpoint
+CREATE TABLE `settings` (
+	`id` text PRIMARY KEY NOT NULL,
+	`location_id` text NOT NULL,
+	`updated_at` integer DEFAULT (unixepoch()) NOT NULL,
+	FOREIGN KEY (`location_id`) REFERENCES `locations`(`id`) ON UPDATE no action ON DELETE no action
+);

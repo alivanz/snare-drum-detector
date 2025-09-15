@@ -1,5 +1,5 @@
 import { getFormProps, getSelectProps, useForm } from "@conform-to/react";
-import { parseWithZod } from "@conform-to/zod";
+import { parseWithZod } from "@conform-to/zod/v4";
 import {
 	Form,
 	Link,

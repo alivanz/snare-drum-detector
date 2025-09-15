@@ -33,7 +33,7 @@
 	"migrations": [
 		{
 			"tag": "v1",
-			"new_classes": ["ScoreStorage"]
+			"new_sqlite_classes": ["ScoreStorage"]
 		}
 	],
 	/**
