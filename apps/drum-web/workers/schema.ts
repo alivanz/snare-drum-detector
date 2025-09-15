@@ -7,6 +7,16 @@ export const locations = sqliteTable("locations", {
 	name: text("name").notNull(), // display name like "New York", "San Francisco"
 });
 
+export const settings = sqliteTable("settings", {
+	id: text("id").primaryKey(), // Always "default"
+	locationId: text("location_id")
+		.notNull()
+		.references(() => locations.id),
+	updatedAt: integer("updated_at", { mode: "timestamp" })
+		.notNull()
+		.default(sql`(unixepoch())`),
+});
+
 export const scores = sqliteTable("scores", {
 	id: text("id")
 		.primaryKey()
@@ -24,5 +34,7 @@ export const scores = sqliteTable("scores", {
 
 export type Location = typeof locations.$inferSelect;
 export type NewLocation = typeof locations.$inferInsert;
+export type Settings = typeof settings.$inferSelect;
+export type NewSettings = typeof settings.$inferInsert;
 export type Score = typeof scores.$inferSelect;
 export type NewScore = typeof scores.$inferInsert;

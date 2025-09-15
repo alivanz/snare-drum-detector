@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { desc, eq } from "drizzle-orm";
+import { type AnyColumn, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import migrations from "./migrations/migrations.js";
@@ -9,8 +9,13 @@ import {
 	type NewLocation,
 	type NewScore,
 	type Score,
+	type Settings,
 	scores,
+	settings,
 } from "./schema";
+
+// Helper function for excluded columns in upsert
+const excluded = (column: AnyColumn) => sql.raw(`excluded.${column.name}`);
 
 export class ScoreStorage extends DurableObject<Env> {
 	private db: ReturnType<typeof drizzle>;
@@ -55,5 +60,35 @@ export class ScoreStorage extends DurableObject<Env> {
 			.from(scores)
 			.where(eq(scores.locationId, locationId))
 			.orderBy(desc(scores.score));
+	}
+
+	async getSettings(): Promise<Settings | null> {
+		const [result] = await this.db
+			.select()
+			.from(settings)
+			.where(eq(settings.id, "default"));
+
+		return result || null;
+	}
+
+	async updateSettings(locationId: string): Promise<Settings> {
+		// Use upsert (insert with onConflictDoUpdate) with excluded helper
+		const [upserted] = await this.db
+			.insert(settings)
+			.values({
+				id: "default",
+				locationId,
+				updatedAt: new Date(),
+			})
+			.onConflictDoUpdate({
+				target: settings.id,
+				set: {
+					locationId: excluded(settings.locationId),
+					updatedAt: excluded(settings.updatedAt),
+				},
+			})
+			.returning();
+
+		return upserted;
 	}
 }
