@@ -1,5 +1,5 @@
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
-import { useState, useEffect, useRef } from "react";
 import type { Route } from "./+types/game";
 
 export function meta({}: Route.MetaArgs) {
@@ -240,24 +240,27 @@ export default function Game() {
 
 	// Format score with decimal separator
 	const formatScore = (num: number) => {
-		return num.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+		return num.toLocaleString("en-US", {
+			minimumFractionDigits: 3,
+			maximumFractionDigits: 3,
+		});
 	};
 
 	// Format time as MM:SS
 	const formatTime = (seconds: number) => {
 		const mins = Math.floor(seconds / 60);
 		const secs = Math.floor(seconds % 60);
-		return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+		return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
 	};
 
 	return (
-		<div 
+		<div
 			className="min-h-screen flex flex-col items-center justify-center p-4 relative"
 			style={{
-				backgroundImage: 'url(/background.jpg)',
-				backgroundSize: 'cover',
-				backgroundPosition: 'center',
-				backgroundRepeat: 'no-repeat'
+				backgroundImage: "url(/background.jpg)",
+				backgroundSize: "cover",
+				backgroundPosition: "center",
+				backgroundRepeat: "no-repeat",
 			}}
 		>
 			{/* Connection Error */}
@@ -280,15 +283,20 @@ export default function Game() {
 					)}
 
 					{/* Timer Badge */}
-					<div className="mb-8 px-12 py-4 rounded-lg"
+					<div
+						className="mb-8 px-12 py-4 rounded-lg"
 						style={{
-							background: 'linear-gradient(180deg, #E0E0E0 0%, #9E9E9E 50%, #757575 100%)',
-							boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+							background:
+								"linear-gradient(180deg, #E0E0E0 0%, #9E9E9E 50%, #757575 100%)",
+							boxShadow:
+								"0 4px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.5)",
 						}}
 					>
 						<div className="flex items-center gap-4">
 							<span className="text-3xl">⏱</span>
-							<span className="text-4xl font-bold text-black">{formatTime(timeRemaining)}</span>
+							<span className="text-4xl font-bold text-black">
+								{formatTime(timeRemaining)}
+							</span>
 						</div>
 					</div>
 
@@ -328,11 +336,15 @@ export default function Game() {
 			{gameStatus === "ended" && (
 				<div className="text-center">
 					<div className="bg-black/60 backdrop-blur-sm rounded-2xl p-12 border border-white/20 max-w-md">
-						<div className="text-4xl font-bold text-white mb-6 uppercase tracking-wider">Game Over!</div>
+						<div className="text-4xl font-bold text-white mb-6 uppercase tracking-wider">
+							Game Over!
+						</div>
 						<div className="text-6xl text-white font-bold mb-2">
 							{formatScore(score)}
 						</div>
-						<div className="text-xl text-white/80 mb-6 uppercase">Total Hits</div>
+						<div className="text-xl text-white/80 mb-6 uppercase">
+							Total Hits
+						</div>
 						<div className="text-white/60 space-y-2 mb-8">
 							<div>Average: {(score / GAME_DURATION).toFixed(1)} hits/sec</div>
 							<div>Best Combo: {bestCombo}x</div>
@@ -345,7 +357,10 @@ export default function Game() {
 							>
 								Play Again
 							</button>
-							<Link to="/" className="block w-full px-6 py-3 bg-transparent border-2 border-white text-white font-bold uppercase tracking-wider rounded hover:bg-white/10 transition-colors">
+							<Link
+								to="/"
+								className="block w-full px-6 py-3 bg-transparent border-2 border-white text-white font-bold uppercase tracking-wider rounded hover:bg-white/10 transition-colors"
+							>
 								Back to Home
 							</Link>
 						</div>
@@ -356,8 +371,8 @@ export default function Game() {
 			{/* Cancel Button */}
 			{gameStatus !== "ended" && (
 				<div className="absolute bottom-8 right-8">
-					<Link 
-						to="/" 
+					<Link
+						to="/"
 						className="text-white text-xl font-bold uppercase tracking-wider hover:text-white/80 transition-colors underline"
 					>
 						Cancel

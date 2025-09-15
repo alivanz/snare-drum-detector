@@ -52,11 +52,12 @@ const mockLeaderboards = {
 
 export default function Leaderboard() {
 	const currentCity = "jakarta";
-	const currentLeaderboard = mockLeaderboards[currentCity] || mockLeaderboards.jakarta;
+	const currentLeaderboard =
+		mockLeaderboards[currentCity] || mockLeaderboards.jakarta;
 	const cityNames = {
 		jakarta: "Jakarta",
-		surabaya: "Surabaya", 
-		bandung: "Bandung"
+		surabaya: "Surabaya",
+		bandung: "Bandung",
 	};
 
 	return (
@@ -71,12 +72,9 @@ export default function Leaderboard() {
 					</p>
 				</div>
 
-
 				<div className="flat-card overflow-hidden">
 					<div className="bg-zinc-800 px-6 py-4 border-b border-zinc-700">
-						<h2 className="text-xl font-semibold text-white">
-							Leaderboard
-						</h2>
+						<h2 className="text-xl font-semibold text-white">Leaderboard</h2>
 					</div>
 
 					<div className="overflow-x-auto">

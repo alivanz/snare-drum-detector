@@ -4,7 +4,10 @@ import { Layout } from "./layout";
 export function meta({}: Route.MetaArgs) {
 	return [
 		{ title: "Settings - Snare Drum Challenge" },
-		{ name: "description", content: "Select your city to compete on local leaderboards!" },
+		{
+			name: "description",
+			content: "Select your city to compete on local leaderboards!",
+		},
 	];
 }
 
@@ -40,7 +43,8 @@ export default function Settings() {
 							🏙️ Select Your City
 						</h2>
 						<p className="text-zinc-400 mb-6">
-							Choose your city to compete with players in your area. Each city has its own leaderboard!
+							Choose your city to compete with players in your area. Each city
+							has its own leaderboard!
 						</p>
 					</div>
 
@@ -62,7 +66,9 @@ export default function Settings() {
 					</div>
 
 					<div className="mt-8 p-4 bg-zinc-800 border border-zinc-700">
-						<h3 className="text-lg font-semibold text-white mb-2">Current Selection</h3>
+						<h3 className="text-lg font-semibold text-white mb-2">
+							Current Selection
+						</h3>
 						<div className="text-zinc-400">
 							<span className="text-yellow-400">⚠️ No city selected</span>
 						</div>
@@ -73,17 +79,19 @@ export default function Settings() {
 				</div>
 
 				<div className="space-y-4">
-					<button className="w-full flat-button-primary">
-						Save Settings
-					</button>
+					<button className="w-full flat-button-primary">Save Settings</button>
 				</div>
 
 				<div className="mt-8 flat-card p-6">
-					<h3 className="text-lg font-semibold text-white mb-3">🌏 About City Leaderboards</h3>
+					<h3 className="text-lg font-semibold text-white mb-3">
+						🌏 About City Leaderboards
+					</h3>
 					<ul className="text-zinc-300 space-y-2 text-sm">
 						<li>• Each city has its own separate leaderboard</li>
 						<li>• Compete with players in your local area</li>
-						<li>• Your scores will only appear on your selected city's leaderboard</li>
+						<li>
+							• Your scores will only appear on your selected city's leaderboard
+						</li>
 						<li>• You can change your city selection anytime</li>
 					</ul>
 				</div>

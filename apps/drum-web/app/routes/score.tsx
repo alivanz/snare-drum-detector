@@ -53,21 +53,14 @@ export default function Score() {
 
 				<div className="space-y-4">
 					<div className="flex justify-center space-x-4">
-						<Link
-							to="/"
-							className="flat-button"
-						>
+						<Link to="/" className="flat-button">
 							Play Again
 						</Link>
-						<Link
-							to="/leaderboard"
-							className="flat-button"
-						>
+						<Link to="/leaderboard" className="flat-button">
 							View Leaderboard
 						</Link>
 					</div>
 				</div>
-
 			</div>
 		</div>
 	);
