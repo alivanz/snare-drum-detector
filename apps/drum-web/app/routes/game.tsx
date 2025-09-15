@@ -238,130 +238,143 @@ export default function Game() {
 		setGameStatus("countdown");
 	};
 
+	// Format score with decimal separator
+	const formatScore = (num: number) => {
+		return num.toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+	};
+
+	// Format time as MM:SS
+	const formatTime = (seconds: number) => {
+		const mins = Math.floor(seconds / 60);
+		const secs = Math.floor(seconds % 60);
+		return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+	};
+
 	return (
-		<div className="min-h-screen bg-zinc-950 flex flex-col items-center justify-center p-4">
-			<div className="max-w-4xl mx-auto text-center">
-				{/* Connection Status */}
-				{connectionError && (
-					<div className="mb-4 p-4 bg-red-900/50 border border-red-500 text-red-300">
-						⚠️ {connectionError}
-					</div>
-				)}
-
-				{/* Game Header */}
-				<div className="mb-8">
-					<h1 className="text-4xl font-bold text-white mb-4">
-						Snare Drum Challenge
-					</h1>
-					<div className="flex justify-center items-center space-x-8 text-2xl">
-						<div className="flat-card px-6 py-3">
-							<span className="text-zinc-400">Time:</span>
-							<span
-								className={`font-mono ml-2 ${timeRemaining < 5 ? "text-red-400" : "text-green-400"}`}
-							>
-								{timeRemaining.toFixed(1)}s
-							</span>
-						</div>
-						<div className="flat-card px-6 py-3">
-							<span className="text-zinc-400">Score:</span>
-							<span
-								className={`text-green-400 font-mono ml-2 transition-all ${drumAnimation ? "scale-125" : ""}`}
-							>
-								{score}
-							</span>
-						</div>
-					</div>
+		<div 
+			className="min-h-screen flex flex-col items-center justify-center p-4 relative"
+			style={{
+				backgroundImage: 'url(/background.jpg)',
+				backgroundSize: 'cover',
+				backgroundPosition: 'center',
+				backgroundRepeat: 'no-repeat'
+			}}
+		>
+			{/* Connection Error */}
+			{connectionError && (
+				<div className="absolute top-4 left-1/2 transform -translate-x-1/2 p-4 bg-red-900/80 border border-red-500 text-red-300 rounded-lg backdrop-blur-sm">
+					⚠️ {connectionError}
 				</div>
+			)}
 
-				{/* Drum Visual */}
-				<div className="mb-12">
-					<div
-						className={`w-80 h-80 mx-auto bg-red-600 border-4 border-red-500 flex items-center justify-center transition-transform ${
-							drumAnimation ? "scale-110" : ""
-						}`}
+			{/* Main Game UI - Always visible when playing or countdown */}
+			{(gameStatus === "playing" || gameStatus === "countdown") && (
+				<div className="flex flex-col items-center">
+					{/* Combo Display */}
+					{currentCombo > 1 && (
+						<div className="mb-8">
+							<h2 className="text-5xl font-bold text-white uppercase tracking-wider italic">
+								COMBO <span className="text-6xl">{currentCombo}x</span>
+							</h2>
+						</div>
+					)}
+
+					{/* Timer Badge */}
+					<div className="mb-8 px-12 py-4 rounded-lg"
+						style={{
+							background: 'linear-gradient(180deg, #E0E0E0 0%, #9E9E9E 50%, #757575 100%)',
+							boxShadow: '0 4px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.5)'
+						}}
 					>
-						<span className="text-8xl select-none">🥁</span>
+						<div className="flex items-center gap-4">
+							<span className="text-3xl">⏱</span>
+							<span className="text-4xl font-bold text-black">{formatTime(timeRemaining)}</span>
+						</div>
+					</div>
+
+					{/* Score Card */}
+					<div className="bg-black/60 backdrop-blur-sm rounded-lg p-8 border-2 border-white/30 min-w-[400px]">
+						<h3 className="text-xl text-white/80 uppercase tracking-widest mb-4 text-center">
+							YOUR SCORE
+						</h3>
+						<div className="text-7xl font-bold text-white text-center">
+							{formatScore(score)}
+						</div>
+					</div>
+
+					{/* Motivational Text */}
+					<div className="mt-8">
+						<p className="text-2xl text-white uppercase tracking-wider font-semibold">
+							KEEP HITTING THE SNARE!
+						</p>
 					</div>
 				</div>
+			)}
 
-				{/* Game State Display */}
-				{gameStatus === "countdown" && (
-					<div className="mb-8 flat-card p-8">
-						<div className="text-6xl font-bold text-red-400 mb-4">
+			{/* Countdown Overlay */}
+			{gameStatus === "countdown" && (
+				<div className="fixed inset-0 bg-black/75 flex flex-col items-center justify-center z-50">
+					<div className="text-center">
+						<div className="text-[200px] font-bold text-white mb-8 leading-none">
 							{countdown}
 						</div>
-						<div className="text-xl text-zinc-300">{getCountdownText()}</div>
-						<div className="text-sm text-zinc-500 mt-2">
-							Game starts in {countdown} seconds. Prepare your drumsticks!
-						</div>
+						<p className="text-5xl text-white uppercase tracking-wider font-bold italic">
+							{getCountdownText()}
+						</p>
 					</div>
-				)}
+				</div>
+			)}
 
-				{gameStatus === "playing" && (
-					<div className="mb-8">
-						<div className="text-zinc-400 text-lg mb-4">
-							Hit your physical snare drum to score points!
+			{gameStatus === "ended" && (
+				<div className="text-center">
+					<div className="bg-black/60 backdrop-blur-sm rounded-2xl p-12 border border-white/20 max-w-md">
+						<div className="text-4xl font-bold text-white mb-6 uppercase tracking-wider">Game Over!</div>
+						<div className="text-6xl text-white font-bold mb-2">
+							{formatScore(score)}
 						</div>
-						{currentCombo > 1 && (
-							<div className="text-2xl text-yellow-400 font-bold animate-pulse">
-								🔥 Combo x{currentCombo}!
-							</div>
-						)}
-					</div>
-				)}
-
-				{gameStatus === "ended" && (
-					<div className="mb-8 flat-card p-8">
-						<div className="text-3xl font-bold text-white mb-4">Game Over!</div>
-						<div className="text-5xl text-green-400 font-bold mb-2">
-							{score}
-						</div>
-						<div className="text-xl text-zinc-300 mb-4">Total Hits</div>
-						<div className="text-zinc-400 space-y-2">
+						<div className="text-xl text-white/80 mb-6 uppercase">Total Hits</div>
+						<div className="text-white/60 space-y-2 mb-8">
 							<div>Average: {(score / GAME_DURATION).toFixed(1)} hits/sec</div>
-							<div>Best Combo: {bestCombo}</div>
+							<div>Best Combo: {bestCombo}x</div>
 						</div>
-						<div className="mt-6 space-y-3">
+						<div className="space-y-3">
 							<button
 								type="button"
 								onClick={playAgain}
-								className="flat-button-primary w-full"
+								className="w-full px-6 py-3 bg-white text-black font-bold uppercase tracking-wider rounded hover:bg-gray-200 transition-colors"
 							>
 								Play Again
 							</button>
-							<Link to="/" className="flat-button block">
+							<Link to="/" className="block w-full px-6 py-3 bg-transparent border-2 border-white text-white font-bold uppercase tracking-wider rounded hover:bg-white/10 transition-colors">
 								Back to Home
 							</Link>
 						</div>
 					</div>
-				)}
+				</div>
+			)}
 
-				{/* Cancel/Actions */}
-				{gameStatus !== "ended" && (
-					<div className="flex justify-center">
-						<Link to="/" className="flat-button">
-							Cancel Game
-						</Link>
-					</div>
-				)}
-			</div>
+			{/* Cancel Button */}
+			{gameStatus !== "ended" && (
+				<div className="absolute bottom-8 right-8">
+					<Link 
+						to="/" 
+						className="text-white text-xl font-bold uppercase tracking-wider hover:text-white/80 transition-colors underline"
+					>
+						Cancel
+					</Link>
+				</div>
+			)}
 
-			{/* Stats Overlay */}
+			{/* Connection Status Indicator */}
 			{gameStatus === "playing" && (
-				<div className="fixed bottom-4 right-4 flat-card p-4">
-					<div className="text-zinc-400 text-sm space-y-1">
-						<div className="flex items-center gap-2">
-							<span
-								className={`w-2 h-2 rounded-full ${isConnected ? "bg-green-400" : "bg-red-400"}`}
-							></span>
+				<div className="absolute top-4 right-4">
+					<div className="flex items-center gap-2 bg-black/40 backdrop-blur-sm rounded-full px-4 py-2">
+						<span
+							className={`w-3 h-3 rounded-full ${isConnected ? "bg-green-400" : "bg-red-400"} animate-pulse`}
+						></span>
+						<span className="text-white text-sm">
 							{isConnected ? "Connected" : "Disconnected"}
-						</div>
-						<div>
-							Hit Rate: <span className="text-white">{hitRate} hits/sec</span>
-						</div>
-						<div>
-							Best Combo: <span className="text-yellow-400">{bestCombo}</span>
-						</div>
+						</span>
 					</div>
 				</div>
 			)}
