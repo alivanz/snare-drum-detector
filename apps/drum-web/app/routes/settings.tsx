@@ -77,7 +77,7 @@ export default function Settings() {
 		<div
 			className="min-h-screen flex flex-col items-center justify-center p-4"
 			style={{
-				backgroundImage: "url(/background.jpg)",
+				backgroundImage: "url(/background.png)",
 				backgroundSize: "cover",
 				backgroundPosition: "center",
 				backgroundRepeat: "no-repeat",
