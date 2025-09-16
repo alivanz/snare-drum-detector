@@ -59,17 +59,23 @@ export default function Home() {
 
 			{/* Start Challenge Button */}
 			<div
-				className="px-16 py-6 rounded-lg cursor-pointer hover:scale-105 transition-transform"
+				className="relative px-12 py-5 rounded-xl cursor-pointer hover:scale-105 transition-transform border-2 border-white"
 				style={{
 					background:
-						"linear-gradient(180deg, #E0E0E0 0%, #9E9E9E 50%, #757575 100%)",
-					boxShadow:
-						"0 6px 12px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.5)",
+						"linear-gradient(135deg, #8E8E8E 0%, #FFFFFF 22.1154%, #BCBCBC 39.4231%, #FFFFFF 70.6735%, #878787 96.1538%)",
+					filter: "drop-shadow(0px 3px 46px rgba(255, 255, 255, 0.35))",
 				}}
 			>
 				<Link
 					to="/game"
-					className="text-3xl font-bold text-black uppercase tracking-wider"
+					className="relative text-3xl font-bold uppercase tracking-wider"
+					style={{
+						background: "linear-gradient(180deg, #000000 14.4311%, #141414 70.3631%)",
+						WebkitBackgroundClip: "text",
+						WebkitTextFillColor: "transparent",
+						backgroundClip: "text",
+						textShadow: "0 1px 0 rgba(255, 255, 255, 0.3)",
+					}}
 				>
 					START CHALLENGE
 				</Link>

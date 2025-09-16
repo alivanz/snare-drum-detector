@@ -91,7 +91,7 @@ interface ConnectedMessage {
 	message: string;
 }
 
-const GAME_DURATION = 60; // seconds
+const GAME_DURATION = 5; // seconds
 const COUNTDOWN_DURATION = 3; // seconds
 const WEBSOCKET_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8765";
 
@@ -387,7 +387,11 @@ export default function Game() {
 						}}
 					>
 						<div className="flex items-center gap-4">
-							<span className="text-3xl">⏱</span>
+							<img 
+								src="/stopwatch.svg"
+								alt="Timer"
+								className="w-10 h-10"
+							/>
 							<span className="text-4xl font-bold text-black font-mono inline-block" style={{ width: "180px", textAlign: "center" }}>
 								{formatTime(timeRemaining)}
 							</span>
@@ -406,9 +410,11 @@ export default function Game() {
 
 					{/* Motivational Text */}
 					<div className="mt-8">
-						<p className="text-2xl text-white uppercase tracking-wider font-semibold">
-							KEEP HITTING THE SNARE!
-						</p>
+						<img 
+							src="/keep-hitting-the-snare.svg"
+							alt="KEEP HITTING THE SNARE!"
+							className="mx-auto h-20"
+						/>
 					</div>
 				</div>
 			)}
@@ -430,22 +436,15 @@ export default function Game() {
 			{gameStatus === "ended" && (
 				<div className="flex flex-col items-center justify-center min-h-screen">
 					{/* CONGRATULATIONS title */}
-					<h1 
-						className="text-7xl font-bold uppercase tracking-wider mb-12"
-						style={{
-							background: "linear-gradient(180deg, #E0E0E0 0%, #9E9E9E 50%, #757575 100%)",
-							WebkitBackgroundClip: "text",
-							WebkitTextFillColor: "transparent",
-							backgroundClip: "text",
-							textShadow: "0 4px 8px rgba(0, 0, 0, 0.3)"
-						}}
-					>
-						CONGRATULATIONS!
-					</h1>
+					<img 
+						src="/congratulations.svg"
+						alt="CONGRATULATIONS!"
+						className="w-full max-w-4xl mx-auto mb-12"
+					/>
 
 					{/* Score Box with Badge */}
 					<div className="relative mb-16">
-						<div className="bg-neutral-800 border-4 border-white rounded-2xl px-20 py-12">
+						<div className="bg-neutral-800 border-4 border-white rounded-2xl px-32 py-12">
 							<div className="text-white uppercase tracking-widest text-2xl mb-6 text-center">
 								YOUR SCORE
 							</div>
@@ -456,25 +455,22 @@ export default function Game() {
 
 						{/* Badge positioned at bottom of score box */}
 						{fetcher.data?.isNewHighScore ? (
-							<div 
-								className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 px-8 py-3 rounded-full whitespace-nowrap"
-								style={{
-									background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
-									boxShadow: "0 4px 12px rgba(255, 215, 0, 0.4)"
-								}}
-							>
-								<span className="text-black font-bold text-xl uppercase tracking-wider">
-									IT'S A NEW RECORD!
-								</span>
-							</div>
+							<img 
+								src="/new-record.svg"
+								alt="It's a new record!"
+								className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 h-16"
+							/>
 						) : (
-							<div 
-								className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-2 bg-black border-2 border-white rounded-full whitespace-nowrap"
-							>
-								<span className="text-white text-sm uppercase tracking-wider">
-									YOU CAN TRY AGAIN, AND ACHIEVE ALL TIME RECORD!
-								</span>
-							</div>
+							<img 
+								src="/try-again.svg"
+								alt="You can try again, and achieve all time record!"
+								className="absolute left-1/2 transform -translate-x-1/2"
+								style={{ 
+									bottom: "-32px",
+									width: "550px",
+									maxWidth: "85vw"
+								}}
+							/>
 						)}
 					</div>
 
