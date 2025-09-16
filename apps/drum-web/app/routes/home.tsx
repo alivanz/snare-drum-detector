@@ -48,11 +48,11 @@ export default function Home() {
 			}}
 		>
 			{/* All Time Record Display */}
-			<div className="bg-neutral-800 rounded-lg p-12 border-2 border-white/30 mb-16">
-				<h1 className="text-2xl text-white/80 uppercase tracking-widest mb-6 text-center">
+			<div className="bg-neutral-800 rounded-lg px-48 py-12 border-4 border-white mb-16">
+				<h1 className="text-2xl text-white uppercase tracking-widest mb-6 text-center">
 					ALL TIME RECORD
 				</h1>
-				<div className="text-8xl font-bold text-white text-center">
+				<div className="text-9xl font-bold text-white text-center">
 					{maxScore !== null ? maxScore.toLocaleString() : "---"}
 				</div>
 			</div>

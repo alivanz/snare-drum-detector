@@ -399,11 +399,11 @@ export default function Game() {
 					</div>
 
 					{/* Score Card */}
-					<div className="bg-neutral-800 rounded-lg p-8 border-2 border-white/30 min-w-[400px]">
-						<h3 className="text-xl text-white/80 uppercase tracking-widest mb-4 text-center">
+					<div className="bg-neutral-800 rounded-lg px-16 py-8 border-4 border-white min-w-[500px]">
+						<h3 className="text-2xl text-white uppercase tracking-widest mb-6 text-center">
 							YOUR SCORE
 						</h3>
-						<div className="text-7xl font-bold text-white text-center">
+						<div className="text-9xl font-bold text-white text-center">
 							{formatScore(score)}
 						</div>
 					</div>
@@ -444,11 +444,11 @@ export default function Game() {
 
 					{/* Score Box with Badge */}
 					<div className="relative mb-16">
-						<div className="bg-neutral-800 border-4 border-white rounded-2xl px-32 py-12">
+						<div className="bg-neutral-800 border-4 border-white rounded-lg px-48 py-12">
 							<div className="text-white uppercase tracking-widest text-2xl mb-6 text-center">
 								YOUR SCORE
 							</div>
-							<div className="text-white text-7xl font-bold text-center">
+							<div className="text-white text-9xl font-bold text-center">
 								{formatScore(score)}
 							</div>
 						</div>
