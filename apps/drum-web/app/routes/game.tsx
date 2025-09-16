@@ -244,7 +244,7 @@ export default function Game() {
 		if (gameStatus === "playing") {
 			gameTimerRef.current = window.setInterval(() => {
 				setTimeRemaining((prev) => {
-					if (prev <= 0.1) {
+					if (prev <= 0.01) {
 						// End the game
 						console.log("Game ending - timer reached 0");
 						if (gameTimerRef.current) {
@@ -253,12 +253,12 @@ export default function Game() {
 						setGameStatus("ended");
 						return 0;
 					}
-					return prev - 0.1;
+					return prev - 0.01;
 				});
 
 				// Update hit rate periodically
 				calculateHitRate();
-			}, 100); // Update every 100ms for smooth timer
+			}, 10); // Update every 10ms for smooth millisecond display
 
 			return () => {
 				if (gameTimerRef.current) {
@@ -339,11 +339,12 @@ export default function Game() {
 		return num.toLocaleString("en-US");
 	};
 
-	// Format time as MM:SS
+	// Format time as MM:SS.ms
 	const formatTime = (seconds: number) => {
 		const mins = Math.floor(seconds / 60);
 		const secs = Math.floor(seconds % 60);
-		return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+		const ms = Math.floor((seconds % 1) * 100);
+		return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}.${ms.toString().padStart(2, "0")}`;
 	};
 
 	return (
@@ -387,7 +388,7 @@ export default function Game() {
 					>
 						<div className="flex items-center gap-4">
 							<span className="text-3xl">⏱</span>
-							<span className="text-4xl font-bold text-black">
+							<span className="text-4xl font-bold text-black font-mono inline-block" style={{ width: "180px", textAlign: "center" }}>
 								{formatTime(timeRemaining)}
 							</span>
 						</div>
