@@ -51,6 +51,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 		return submission.reply({ formErrors: ["No location set"] });
 	}
 
+	// Get the current highest score before adding the new one
+	const currentHighScore = await stub.getHighestScore(currentSettings.locationId);
+	const isNewHighScore = !currentHighScore || submission.value.score > currentHighScore;
+
 	// Add the score
 	await stub.addScore({
 		locationId: currentSettings.locationId,
@@ -63,11 +67,12 @@ export async function action({ request, context }: Route.ActionArgs) {
 		locationId: currentSettings.locationId,
 		score: submission.value.score,
 		combo: submission.value.combo,
-		duration: submission.value.duration * 1000
+		duration: submission.value.duration * 1000,
+		isNewHighScore
 	});
 
-	// Return a simple success response instead of using Conform's reply
-	return { success: true };
+	// Return success with new high score flag
+	return { success: true, isNewHighScore };
 }
 
 type GameStatus = "countdown" | "playing" | "ended";
@@ -86,7 +91,7 @@ interface ConnectedMessage {
 	message: string;
 }
 
-const GAME_DURATION = 60; // seconds
+const GAME_DURATION = 10; // seconds
 const COUNTDOWN_DURATION = 3; // seconds
 const WEBSOCKET_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8765";
 
@@ -329,20 +334,6 @@ export default function Game() {
 		}
 	};
 
-	const playAgain = () => {
-		// Reset all state
-		setScore(0);
-		setTimeRemaining(GAME_DURATION);
-		setHitRate(0);
-		setBestCombo(0);
-		setCurrentCombo(0);
-		setScoreSubmitted(false);
-		hitTimestampsRef.current = [];
-		lastHitTimeRef.current = 0;
-		// Set game status to countdown last - this will trigger the countdown timer
-		setGameStatus("countdown");
-	};
-
 	// Format score with thousands separator
 	const formatScore = (num: number) => {
 		return num.toLocaleString("en-US");
@@ -403,7 +394,7 @@ export default function Game() {
 					</div>
 
 					{/* Score Card */}
-					<div className="bg-black/60 backdrop-blur-sm rounded-lg p-8 border-2 border-white/30 min-w-[400px]">
+					<div className="bg-neutral-800 rounded-lg p-8 border-2 border-white/30 min-w-[400px]">
 						<h3 className="text-xl text-white/80 uppercase tracking-widest mb-4 text-center">
 							YOUR SCORE
 						</h3>
@@ -436,42 +427,68 @@ export default function Game() {
 			)}
 
 			{gameStatus === "ended" && (
-				<div className="text-center">
-					<div className="bg-black/60 backdrop-blur-sm rounded-2xl p-12 border border-white/20 max-w-md">
-						<div className="text-4xl font-bold text-white mb-6 uppercase tracking-wider">
-							Game Over!
+				<div className="flex flex-col items-center justify-center min-h-screen">
+					{/* CONGRATULATIONS title */}
+					<h1 
+						className="text-7xl font-bold uppercase tracking-wider mb-12"
+						style={{
+							background: "linear-gradient(180deg, #E0E0E0 0%, #9E9E9E 50%, #757575 100%)",
+							WebkitBackgroundClip: "text",
+							WebkitTextFillColor: "transparent",
+							backgroundClip: "text",
+							textShadow: "0 4px 8px rgba(0, 0, 0, 0.3)"
+						}}
+					>
+						CONGRATULATIONS!
+					</h1>
+
+					{/* Score Box with Badge */}
+					<div className="relative mb-16">
+						<div className="bg-neutral-800 border-4 border-white rounded-2xl px-20 py-12">
+							<div className="text-white uppercase tracking-widest text-2xl mb-6 text-center">
+								YOUR SCORE
+							</div>
+							<div className="text-white text-7xl font-bold text-center">
+								{formatScore(score)}
+							</div>
 						</div>
-						<div className="text-6xl text-white font-bold mb-2">
-							{formatScore(score)}
-						</div>
-						<div className="text-xl text-white/80 mb-6 uppercase">
-							Total Hits
-						</div>
-						<div className="text-white/60 space-y-2 mb-8">
-							<div>Average: {(score / GAME_DURATION).toFixed(1)} hits/sec</div>
-							<div>Best Combo: {bestCombo}x</div>
-							{fetcher.state === "submitting" && (
-								<div className="text-yellow-400">Saving score...</div>
-							)}
-							{fetcher.state === "idle" && fetcher.data?.success && (
-								<div className="text-green-400">✓ Score saved!</div>
-							)}
-						</div>
-						<div className="space-y-3">
-							<button
-								type="button"
-								onClick={playAgain}
-								className="w-full px-6 py-3 bg-white text-black font-bold uppercase tracking-wider rounded hover:bg-gray-200 transition-colors"
+
+						{/* Badge positioned at bottom of score box */}
+						{fetcher.data?.isNewHighScore ? (
+							<div 
+								className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 px-8 py-3 rounded-full whitespace-nowrap"
+								style={{
+									background: "linear-gradient(135deg, #FFD700 0%, #FFA500 100%)",
+									boxShadow: "0 4px 12px rgba(255, 215, 0, 0.4)"
+								}}
 							>
-								Play Again
-							</button>
-							<Link
-								to="/"
-								className="block w-full px-6 py-3 bg-transparent border-2 border-white text-white font-bold uppercase tracking-wider rounded hover:bg-white/10 transition-colors"
+								<span className="text-black font-bold text-xl uppercase tracking-wider">
+									IT'S A NEW RECORD!
+								</span>
+							</div>
+						) : (
+							<div 
+								className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 px-6 py-2 bg-black border-2 border-white rounded-full whitespace-nowrap"
 							>
-								Back to Home
-							</Link>
-						</div>
+								<span className="text-white text-sm uppercase tracking-wider">
+									YOU CAN TRY AGAIN, AND ACHIEVE ALL TIME RECORD!
+								</span>
+							</div>
+						)}
+					</div>
+
+					{/* Back to Home Link */}
+					<div className="mt-16">
+						<Link 
+							to="/"
+							className="text-white text-2xl font-bold uppercase tracking-widest hover:text-white/80 transition-colors"
+							style={{
+								textDecoration: "underline",
+								textUnderlineOffset: "8px"
+							}}
+						>
+							BACK TO HOME
+						</Link>
 					</div>
 				</div>
 			)}

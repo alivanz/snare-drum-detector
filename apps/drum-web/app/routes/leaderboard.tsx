@@ -157,7 +157,7 @@ export default function Leaderboard() {
 											{entry.combo}x
 										</td>
 										<td className="py-3 px-4 text-center text-white/40 text-sm">
-											{formatDateTime(entry.timestamp)}
+											{formatDateTime(entry.timestamp.toString())}
 										</td>
 									</tr>
 								))}

@@ -48,7 +48,7 @@ export default function Home() {
 			}}
 		>
 			{/* All Time Record Display */}
-			<div className="bg-black/60 backdrop-blur-sm rounded-lg p-12 border-2 border-white/30 mb-16">
+			<div className="bg-neutral-800 rounded-lg p-12 border-2 border-white/30 mb-16">
 				<h1 className="text-2xl text-white/80 uppercase tracking-widest mb-6 text-center">
 					ALL TIME RECORD
 				</h1>
