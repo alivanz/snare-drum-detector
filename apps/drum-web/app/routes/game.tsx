@@ -75,7 +75,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 	return { success: true, isNewHighScore };
 }
 
-type GameStatus = "countdown" | "playing" | "ended";
+type GameStatus = "ready" | "countdown" | "playing" | "ended";
 
 interface HitMessage {
 	type: "hit";
@@ -96,7 +96,7 @@ const COUNTDOWN_DURATION = 3; // seconds
 const WEBSOCKET_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8765";
 
 export default function Game() {
-	const [gameStatus, setGameStatus] = useState<GameStatus>("countdown");
+	const [gameStatus, setGameStatus] = useState<GameStatus>("ready");
 	const [score, setScore] = useState(0);
 	const [countdown, setCountdown] = useState(COUNTDOWN_DURATION);
 	const [timeRemaining, setTimeRemaining] = useState(GAME_DURATION);
@@ -114,7 +114,7 @@ export default function Game() {
 	const countdownTimerRef = useRef<number | null>(null);
 	const lastHitTimeRef = useRef<number>(0);
 	const hitTimestampsRef = useRef<number[]>([]);
-	const gameStatusRef = useRef<GameStatus>("countdown");
+	const gameStatusRef = useRef<GameStatus>("ready");
 	const gameStartTimeRef = useRef<number>(0);
 
 	// Calculate hit rate based on recent hits
@@ -361,6 +361,58 @@ export default function Game() {
 			{connectionError && (
 				<div className="absolute top-4 left-1/2 transform -translate-x-1/2 p-4 bg-red-900/80 border border-red-500 text-red-300 rounded-lg backdrop-blur-sm">
 					⚠️ {connectionError}
+				</div>
+			)}
+
+			{/* Ready Screen - "LET'S START" */}
+			{gameStatus === "ready" && (
+				<div className="flex flex-col items-center">
+					{/* Timer Badge */}
+					<div
+						className="mb-8 px-12 py-4 rounded-lg"
+						style={{
+							background:
+								"linear-gradient(180deg, #E0E0E0 0%, #9E9E9E 50%, #757575 100%)",
+							boxShadow:
+								"0 4px 6px rgba(0, 0, 0, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.5)",
+						}}
+					>
+						<div className="flex items-center gap-4">
+							<img 
+								src="/stopwatch.svg"
+								alt="Timer"
+								className="w-10 h-10"
+							/>
+							<span className="text-4xl font-bold text-black font-mono inline-block" style={{ width: "180px", textAlign: "center" }}>
+								{formatTime(GAME_DURATION)}
+							</span>
+						</div>
+					</div>
+
+					{/* Score Card */}
+					<div className="bg-neutral-800 rounded-lg px-16 py-8 border-4 border-white min-w-[500px]">
+						<h3 className="text-2xl text-white uppercase tracking-widest mb-6 text-center">
+							YOUR SCORE
+						</h3>
+						<div className="text-9xl font-bold text-white text-center">
+							-
+						</div>
+					</div>
+
+					{/* Let's Start Button */}
+					<div className="mt-12">
+						<button
+							type="button"
+							onClick={() => setGameStatus("countdown")}
+							className="hover:scale-105 transition-transform"
+						>
+							<img 
+								src="/lets-start.svg"
+								alt="LET'S START"
+								className="h-16"
+							/>
+						</button>
+					</div>
 				</div>
 			)}
 
