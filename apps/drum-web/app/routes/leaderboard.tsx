@@ -45,6 +45,37 @@ export async function loader({ context }: Route.LoaderArgs) {
 export default function Leaderboard() {
 	const { scores, locationName } = useLoaderData<typeof loader>();
 
+	// Format date and time in a human-readable way
+	const formatDateTime = (timestamp: string) => {
+		const date = new Date(timestamp);
+		const now = new Date();
+		const diffMs = now.getTime() - date.getTime();
+		const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+		
+		// Format time as HH:MM AM/PM
+		const timeStr = date.toLocaleTimeString("en-US", {
+			hour: "numeric",
+			minute: "2-digit",
+			hour12: true
+		});
+		
+		// Show relative date for recent scores
+		if (diffDays === 0) {
+			return `Today at ${timeStr}`;
+		} else if (diffDays === 1) {
+			return `Yesterday at ${timeStr}`;
+		} else if (diffDays < 7) {
+			return `${diffDays} days ago at ${timeStr}`;
+		} else {
+			// Show full date for older scores
+			return date.toLocaleDateString("en-US", {
+				month: "short",
+				day: "numeric",
+				year: date.getFullYear() !== now.getFullYear() ? "numeric" : undefined
+			}) + ` at ${timeStr}`;
+		}
+	};
+
 	return (
 		<div
 			className="min-h-screen flex flex-col items-center justify-center p-4"
@@ -83,7 +114,7 @@ export default function Leaderboard() {
 										Combo
 									</th>
 									<th className="text-center py-3 px-4 uppercase tracking-wider text-sm text-white/80">
-										Date
+										When
 									</th>
 								</tr>
 							</thead>
@@ -123,10 +154,10 @@ export default function Leaderboard() {
 											{entry.score.toLocaleString()}
 										</td>
 										<td className="py-3 px-4 text-center text-white/60">
-											{entry.combo}
+											{entry.combo}x
 										</td>
 										<td className="py-3 px-4 text-center text-white/40 text-sm">
-											{new Date(entry.timestamp).toLocaleDateString()}
+											{formatDateTime(entry.timestamp)}
 										</td>
 									</tr>
 								))}

@@ -59,7 +59,15 @@ export async function action({ request, context }: Route.ActionArgs) {
 		duration: submission.value.duration * 1000, // Convert to milliseconds
 	});
 
-	return submission.reply({ resetForm: true });
+	console.log("Score saved successfully:", {
+		locationId: currentSettings.locationId,
+		score: submission.value.score,
+		combo: submission.value.combo,
+		duration: submission.value.duration * 1000
+	});
+
+	// Return a simple success response instead of using Conform's reply
+	return { success: true };
 }
 
 type GameStatus = "countdown" | "playing" | "ended";
@@ -78,7 +86,7 @@ interface ConnectedMessage {
 	message: string;
 }
 
-const GAME_DURATION = 30; // seconds
+const GAME_DURATION = 60; // seconds
 const COUNTDOWN_DURATION = 3; // seconds
 const WEBSOCKET_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8765";
 
@@ -233,6 +241,7 @@ export default function Game() {
 				setTimeRemaining((prev) => {
 					if (prev <= 0.1) {
 						// End the game
+						console.log("Game ending - timer reached 0");
 						if (gameTimerRef.current) {
 							clearInterval(gameTimerRef.current);
 						}
@@ -256,7 +265,14 @@ export default function Game() {
 
 	// Submit score when game ends
 	useEffect(() => {
-		if (gameStatus === "ended" && !scoreSubmitted && score > 0) {
+		console.log("Score submission check:", {
+			gameStatus,
+			scoreSubmitted,
+			score,
+			condition: gameStatus === "ended" && !scoreSubmitted
+		});
+		
+		if (gameStatus === "ended" && !scoreSubmitted) {
 			const gameDuration = (Date.now() - gameStartTimeRef.current) / 1000; // Convert to seconds
 
 			const formData = new FormData();
@@ -264,10 +280,26 @@ export default function Game() {
 			formData.append("combo", bestCombo.toString());
 			formData.append("duration", gameDuration.toString());
 
+			console.log("Submitting score:", {
+				score,
+				combo: bestCombo,
+				duration: gameDuration
+			});
+
 			fetcher.submit(formData, { method: "post" });
 			setScoreSubmitted(true);
 		}
 	}, [gameStatus, score, bestCombo, scoreSubmitted, fetcher]);
+
+	// Log fetcher state for debugging
+	useEffect(() => {
+		if (fetcher.state !== "idle") {
+			console.log("Fetcher state:", fetcher.state);
+		}
+		if (fetcher.data) {
+			console.log("Fetcher response:", fetcher.data);
+		}
+	}, [fetcher.state, fetcher.data]);
 
 	// Cleanup on unmount
 	useEffect(() => {
@@ -311,12 +343,9 @@ export default function Game() {
 		setGameStatus("countdown");
 	};
 
-	// Format score with decimal separator
+	// Format score with thousands separator
 	const formatScore = (num: number) => {
-		return num.toLocaleString("en-US", {
-			minimumFractionDigits: 3,
-			maximumFractionDigits: 3,
-		});
+		return num.toLocaleString("en-US");
 	};
 
 	// Format time as MM:SS
@@ -421,6 +450,12 @@ export default function Game() {
 						<div className="text-white/60 space-y-2 mb-8">
 							<div>Average: {(score / GAME_DURATION).toFixed(1)} hits/sec</div>
 							<div>Best Combo: {bestCombo}x</div>
+							{fetcher.state === "submitting" && (
+								<div className="text-yellow-400">Saving score...</div>
+							)}
+							{fetcher.state === "idle" && fetcher.data?.success && (
+								<div className="text-green-400">✓ Score saved!</div>
+							)}
 						</div>
 						<div className="space-y-3">
 							<button

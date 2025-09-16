@@ -17,6 +17,7 @@
 	"dependencies": {
 		"@conform-to/react": "^1.10.0",
 		"@conform-to/zod": "^1.10.0",
+		"@fontsource/jost": "^5.2.7",
 		"@types/uuid": "^10.0.0",
 		"change-case": "^5.4.4",
 		"drizzle-kit": "^0.31.4",
