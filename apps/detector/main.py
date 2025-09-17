@@ -258,15 +258,15 @@ async def websocket_audio_processor(device_index: Optional[int], threshold: floa
                         blocksize=int(RATE * BLOCK_DURATION)):
         
         while True:
-            if websocket_running and not q.empty():
-                try:
-                    indata = q.get_nowait()
+            try:
+                indata = q.get_nowait()
+                if websocket_running:
                     hit_data = detect_hits_detailed(indata, threshold=threshold)
                     if hit_data:
                         print(f"🥁 Hit #{hit_data['hit_number']} detected (RMS: {hit_data['rms_value']:.3f})")
                         await hit_queue.put(hit_data)
-                except queue.Empty:
-                    pass
+            except queue.Empty:
+                pass
             await asyncio.sleep(0.001)
 
 async def run_websocket_server(host: str, port: int, device_index: Optional[int], threshold: float, verbose: bool):
