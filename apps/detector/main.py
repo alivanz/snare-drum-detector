@@ -8,9 +8,11 @@ import time
 import sys
 import websockets
 from typing import Set, Optional, Dict, Any
+from scipy.signal import butter, lfilter
 
 # Parameters
-THRESHOLD = 0.2       # Adjust based on your mic sensitivity
+THRESHOLD = 0.2       # RMS threshold
+PEAK_THRESHOLD = 0.4  # Peak threshold to filter out bleed
 BLOCK_DURATION = 0.05 # 50 ms blocks
 RATE = 48000
 CHANNELS = 1
@@ -19,6 +21,20 @@ q = queue.Queue()
 hit_count = 0
 last_hit_time = 0
 
+# =========================
+# Bandpass Filter Utilities
+# =========================
+def bandpass_filter(data, lowcut=120, highcut=250, fs=RATE, order=4):
+    """Apply a bandpass filter to isolate snare frequencies (≈120–250 Hz)."""
+    nyquist = 0.5 * fs
+    low = lowcut / nyquist
+    high = highcut / nyquist
+    b, a = butter(order, [low, high], btype='band')
+    return lfilter(b, a, data)
+    
+# =========================
+# Audio Detection
+# =========================
 def audio_callback(indata, frames, time_info, status):
     """Collect audio blocks into a queue."""
     if status:
@@ -26,9 +42,22 @@ def audio_callback(indata, frames, time_info, status):
     q.put(indata.copy())
 
 def detect_hits(indata, threshold=THRESHOLD):
-    """Detect snare hits by checking RMS energy."""
+    """Detect snare hits using bandpass-filtered signal."""
     global last_hit_time
-    rms = np.sqrt(np.mean(indata**2))
+
+    # Use first channel if stereo
+    channel_data = indata[:, 0] if indata.ndim > 1 else indata
+
+    # print(channel_data)
+    # channel_data = np.array([(x if abs(x) > 1 else 0) for x in channel_data])
+    # print(np.abs(channel_data))
+
+    # Apply bandpass filter
+    filtered = bandpass_filter(channel_data)
+
+    # RMS after filtering
+    rms = np.sqrt(np.mean(filtered**2))
+
     now = time.time()
     if rms > threshold and (now - last_hit_time) > 0.15:  # avoid double-counting
         last_hit_time = now
@@ -36,11 +65,20 @@ def detect_hits(indata, threshold=THRESHOLD):
     return False
 
 def detect_hits_detailed(indata, threshold=THRESHOLD):
-    """Detect snare hits and return detailed information."""
+    """Detect snare hits with bandpass filtering and return detailed info."""
     global last_hit_time, hit_count
-    rms = np.sqrt(np.mean(indata**2))
+
+    # Use first channel if stereo
+    channel_data = indata[:, 0] if indata.ndim > 1 else indata
+
+    # Apply bandpass filter
+    filtered = bandpass_filter(channel_data)
+
+    # RMS after filtering
+    rms = np.sqrt(np.mean(filtered**2))
+
     now = time.time()
-    if rms > threshold and (now - last_hit_time) > 0.15:  # avoid double-counting
+    if rms > threshold and (now - last_hit_time) > 0.15:
         last_hit_time = now
         hit_count += 1
         return {
@@ -52,6 +90,9 @@ def detect_hits_detailed(indata, threshold=THRESHOLD):
         }
     return None
 
+# =========================
+# Audio Devices
+# =========================
 def list_devices():
     """List all available audio input devices."""
     devices = sd.query_devices()
@@ -65,12 +106,14 @@ def list_devices():
             print(f"      Channels: {device['max_input_channels']}, Sample Rate: {device['default_samplerate']} Hz")
     print()
 
+# =========================
+# Snare Counter
+# =========================
 def run_snare_counter(duration, device_index=None, threshold=None, verbose=False):
     """Run the snare drum hit counter."""
     global hit_count
     hit_count = 0
     
-    # Use default threshold if not provided
     if threshold is None:
         threshold = THRESHOLD
     
@@ -98,7 +141,9 @@ def run_snare_counter(duration, device_index=None, threshold=None, verbose=False
 
     print(f"\n✅ Total snare hits in {duration} seconds: {hit_count}\n")
 
-# WebSocket server implementation
+# =========================
+# WebSocket Server
+# =========================
 connected_clients: Set = set()  # Set of websocket connections
 websocket_running = False
 
@@ -106,12 +151,10 @@ async def handle_client(websocket):
     """Handle a WebSocket client connection."""
     global connected_clients, websocket_running, hit_count
     
-    # Add client to connected set
     connected_clients.add(websocket)
     client_addr = websocket.remote_address
     print(f"🔗 Client connected from {client_addr}")
     
-    # Send connection confirmation
     await websocket.send(json.dumps({
         "type": "connected",
         "timestamp": time.time(),
@@ -119,25 +162,19 @@ async def handle_client(websocket):
     }))
     
     try:
-        # Start audio processing if this is the first client
         if len(connected_clients) == 1 and not websocket_running:
             websocket_running = True
             hit_count = 0
             print("🎤 Starting audio capture...")
         
-        # Keep connection alive and handle any incoming messages
-        async for message in websocket:
-            # Could handle client commands here if needed
+        async for _ in websocket:
             pass
-            
     except websockets.exceptions.ConnectionClosed:
         pass
     finally:
-        # Remove client from connected set
         connected_clients.remove(websocket)
         print(f"👋 Client disconnected from {client_addr}")
         
-        # Stop audio processing if no clients remain
         if len(connected_clients) == 0:
             websocket_running = False
             print("🛑 No clients connected, audio capture paused")
@@ -146,14 +183,12 @@ async def broadcast_hit(hit_data: Dict[str, Any]):
     """Broadcast hit data to all connected clients."""
     if connected_clients:
         message = json.dumps(hit_data)
-        # Send to all connected clients
         disconnected = set()
         for client in connected_clients:
             try:
                 await client.send(message)
             except websockets.exceptions.ConnectionClosed:
                 disconnected.add(client)
-        # Remove disconnected clients
         for client in disconnected:
             connected_clients.remove(client)
 
@@ -181,7 +216,7 @@ async def websocket_audio_processor(device_index: Optional[int], threshold: floa
                         await broadcast_hit(hit_data)
                 except queue.Empty:
                     pass
-            await asyncio.sleep(0.001)  # Small delay to prevent CPU spinning
+            await asyncio.sleep(0.001)
 
 async def run_websocket_server(host: str, port: int, device_index: Optional[int], threshold: float, verbose: bool):
     """Run the WebSocket server."""
@@ -189,19 +224,20 @@ async def run_websocket_server(host: str, port: int, device_index: Optional[int]
     print(f"📡 Clients can connect to ws://{host}:{port}")
     print("Press Ctrl+C to stop the server\n")
     
-    # Start the audio processor task
     audio_task = asyncio.create_task(websocket_audio_processor(device_index, threshold, verbose))
     
-    # Start the WebSocket server
     async with websockets.serve(handle_client, host, port):
         try:
-            await asyncio.Future()  # Run forever
+            await asyncio.Future()
         except KeyboardInterrupt:
             pass
         finally:
             audio_task.cancel()
             print("\n\n⚠️  WebSocket server stopped")
 
+# =========================
+# Main Entrypoint
+# =========================
 def main():
     parser = argparse.ArgumentParser(
         description="Snare Drum Hit Detector - Count snare drum hits in real-time",
@@ -216,86 +252,34 @@ def main():
   %(prog)s -w --host 0.0.0.0           # Listen on all interfaces"""
     )
     
-    parser.add_argument(
-        '-l', '--list-devices',
-        action='store_true',
-        help='List all available audio input devices and exit'
-    )
-    
-    parser.add_argument(
-        '-d', '--device',
-        type=int,
-        default=None,
-        help='Audio input device index (default: system default)'
-    )
-    
-    parser.add_argument(
-        '-t', '--duration',
-        type=int,
-        default=30,
-        help='Sampling duration in seconds (default: 30)'
-    )
-    
-    parser.add_argument(
-        '--threshold',
-        type=float,
-        default=THRESHOLD,
-        help=f'Detection threshold for snare hits (default: {THRESHOLD})'
-    )
-    
-    parser.add_argument(
-        '-v', '--verbose',
-        action='store_true',
-        help='Enable verbose output'
-    )
-    
-    parser.add_argument(
-        '-w', '--websocket',
-        action='store_true',
-        help='Enable WebSocket server mode for real-time hit streaming'
-    )
-    
-    parser.add_argument(
-        '-p', '--port',
-        type=int,
-        default=8765,
-        help='WebSocket server port (default: 8765)'
-    )
-    
-    parser.add_argument(
-        '--host',
-        type=str,
-        default='localhost',
-        help='WebSocket server host (default: localhost)'
-    )
+    parser.add_argument('-l', '--list-devices', action='store_true', help='List all available audio input devices and exit')
+    parser.add_argument('-d', '--device', type=int, default=None, help='Audio input device index (default: system default)')
+    parser.add_argument('-t', '--duration', type=int, default=30, help='Sampling duration in seconds (default: 30)')
+    parser.add_argument('--threshold', type=float, default=THRESHOLD, help=f'Detection threshold (default: {THRESHOLD})')
+    parser.add_argument('-v', '--verbose', action='store_true', help='Enable verbose output')
+    parser.add_argument('-w', '--websocket', action='store_true', help='Enable WebSocket server mode')
+    parser.add_argument('-p', '--port', type=int, default=8765, help='WebSocket server port (default: 8765)')
+    parser.add_argument('--host', type=str, default='localhost', help='WebSocket server host (default: localhost)')
     
     args = parser.parse_args()
     
-    # Handle list devices flag
     if args.list_devices:
         list_devices()
         sys.exit(0)
     
-    # Validate device index if provided
     if args.device is not None:
         devices = sd.query_devices()
         if args.device < 0 or args.device >= len(devices):
             print(f"Error: Device index {args.device} is out of range.")
-            print("Use --list-devices to see available devices.")
             sys.exit(1)
-        
         if devices[args.device]['max_input_channels'] == 0:
             print(f"Error: Device {args.device} has no input channels.")
-            print("Use --list-devices to see available input devices.")
             sys.exit(1)
     
-    # Handle WebSocket mode
     if args.websocket:
-        # Validate port
         if args.port < 1 or args.port > 65535:
             parser.error("Port must be between 1 and 65535")
         
-        # Run WebSocket server
         try:
             asyncio.run(run_websocket_server(
                 host=args.host,
@@ -311,11 +295,9 @@ def main():
             print(f"\n❌ Error: {e}")
             sys.exit(1)
     else:
-        # Normal mode - validate duration
         if args.duration <= 0:
             parser.error("Duration must be a positive integer")
         
-        # Run the snare counter
         try:
             run_snare_counter(
                 duration=args.duration,
