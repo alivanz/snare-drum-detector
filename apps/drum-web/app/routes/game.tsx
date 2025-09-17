@@ -104,12 +104,11 @@ const WEBSOCKET_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8765";
 
 export default function Game() {
 	const { gameDuration } = useLoaderData<typeof loader>();
-	const GAME_DURATION = gameDuration || 30; // Use duration from settings
-	
+
 	const [gameStatus, setGameStatus] = useState<GameStatus>("ready");
 	const [score, setScore] = useState(0);
 	const [countdown, setCountdown] = useState(COUNTDOWN_DURATION);
-	const [timeRemaining, setTimeRemaining] = useState(GAME_DURATION);
+	const [timeRemaining, setTimeRemaining] = useState(gameDuration);
 	const [hitRate, setHitRate] = useState(0);
 	const [bestCombo, setBestCombo] = useState(0);
 	const [currentCombo, setCurrentCombo] = useState(0);
@@ -219,6 +218,8 @@ export default function Game() {
 		if (gameStatus === "countdown") {
 			// Reset countdown to initial value
 			setCountdown(COUNTDOWN_DURATION);
+			// Reset game timer to configured duration when starting countdown
+			setTimeRemaining(gameDuration);
 
 			countdownTimerRef.current = window.setInterval(() => {
 				setCountdown((prev) => {
@@ -242,7 +243,7 @@ export default function Game() {
 				countdownTimerRef.current = null;
 			}
 		};
-	}, [gameStatus]);
+	}, [gameStatus, gameDuration]);
 
 	// Update gameStatusRef when gameStatus changes
 	useEffect(() => {
@@ -394,7 +395,7 @@ export default function Game() {
 								className="w-10 h-10"
 							/>
 							<span className="text-4xl font-bold text-black font-mono inline-block" style={{ width: "180px", textAlign: "center" }}>
-								{formatTime(GAME_DURATION)}
+								{formatTime(gameDuration)}
 							</span>
 						</div>
 					</div>
