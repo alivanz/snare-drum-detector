@@ -146,14 +146,22 @@ def run_snare_counter(duration, device_index=None, threshold=None, verbose=False
 # =========================
 connected_clients: Set = set()  # Set of websocket connections
 websocket_running = False
+hit_queue = asyncio.Queue()  # Async queue for hit events
 
 async def handle_client(websocket):
     """Handle a WebSocket client connection."""
-    global connected_clients, websocket_running, hit_count
+    global connected_clients, websocket_running, hit_count, hit_queue
     
     connected_clients.add(websocket)
     client_addr = websocket.remote_address
     print(f"🔗 Client connected from {client_addr}")
+    
+    # Drain the queue first to clear any old messages
+    while not hit_queue.empty():
+        try:
+            hit_queue.get_nowait()
+        except asyncio.QueueEmpty:
+            break
     
     await websocket.send(json.dumps({
         "type": "connected",
@@ -161,17 +169,72 @@ async def handle_client(websocket):
         "message": "Connected to snare drum detector"
     }))
     
+    # Create a task to monitor the connection
+    async def monitor_connection():
+        try:
+            async for _ in websocket:
+                pass  # Just monitor for disconnection
+        except websockets.exceptions.ConnectionClosed:
+            pass
+    
+    monitor_task = asyncio.create_task(monitor_connection())
+    queue_task = None
+    
     try:
         if len(connected_clients) == 1 and not websocket_running:
             websocket_running = True
             hit_count = 0
             print("🎤 Starting audio capture...")
         
-        async for _ in websocket:
-            pass
-    except websockets.exceptions.ConnectionClosed:
-        pass
+        # Process messages from the queue
+        while True:
+            # Create task for getting from queue
+            queue_task = asyncio.create_task(hit_queue.get())
+            
+            # Wait for either queue data or connection close
+            done, pending = await asyncio.wait(
+                [queue_task, monitor_task],
+                return_when=asyncio.FIRST_COMPLETED
+            )
+            
+            if monitor_task in done:
+                # Connection closed
+                if not queue_task.done():
+                    queue_task.cancel()
+                    try:
+                        await queue_task
+                    except asyncio.CancelledError:
+                        pass
+                break
+            
+            if queue_task in done:
+                # Got data from queue
+                try:
+                    hit_data = await queue_task
+                    await websocket.send(json.dumps(hit_data))
+                except websockets.exceptions.ConnectionClosed:
+                    # Connection closed while sending, put message back
+                    await hit_queue.put(hit_data)
+                    break
+                    
+    except Exception as e:
+        print(f"Error in client handler: {e}")
     finally:
+        # Clean up tasks
+        if queue_task and not queue_task.done():
+            queue_task.cancel()
+            try:
+                await queue_task
+            except asyncio.CancelledError:
+                pass
+        
+        if not monitor_task.done():
+            monitor_task.cancel()
+            try:
+                await monitor_task
+            except asyncio.CancelledError:
+                pass
+        
         connected_clients.remove(websocket)
         print(f"👋 Client disconnected from {client_addr}")
         
@@ -179,22 +242,10 @@ async def handle_client(websocket):
             websocket_running = False
             print("🛑 No clients connected, audio capture paused")
 
-async def broadcast_hit(hit_data: Dict[str, Any]):
-    """Broadcast hit data to all connected clients."""
-    if connected_clients:
-        message = json.dumps(hit_data)
-        disconnected = set()
-        for client in connected_clients:
-            try:
-                await client.send(message)
-            except websockets.exceptions.ConnectionClosed:
-                disconnected.add(client)
-        for client in disconnected:
-            connected_clients.remove(client)
 
 async def websocket_audio_processor(device_index: Optional[int], threshold: float, verbose: bool):
     """Process audio in WebSocket mode."""
-    global websocket_running, hit_count
+    global websocket_running, hit_count, hit_queue
     
     print(f"\n🎧 Audio device: {device_index if device_index is not None else 'default'}")
     if verbose:
@@ -213,7 +264,7 @@ async def websocket_audio_processor(device_index: Optional[int], threshold: floa
                     hit_data = detect_hits_detailed(indata, threshold=threshold)
                     if hit_data:
                         print(f"🥁 Hit #{hit_data['hit_number']} detected (RMS: {hit_data['rms_value']:.3f})")
-                        await broadcast_hit(hit_data)
+                        await hit_queue.put(hit_data)
                 except queue.Empty:
                     pass
             await asyncio.sleep(0.001)
