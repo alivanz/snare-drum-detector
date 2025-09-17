@@ -91,7 +91,7 @@ interface ConnectedMessage {
 	message: string;
 }
 
-const GAME_DURATION = 5; // seconds
+const GAME_DURATION = 60; // seconds
 const COUNTDOWN_DURATION = 3; // seconds
 const WEBSOCKET_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8765";
 
