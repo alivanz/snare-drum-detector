@@ -1,5 +1,5 @@
 import { DurableObject } from "cloudflare:workers";
-import { type AnyColumn, desc, eq, sql } from "drizzle-orm";
+import { type AnyColumn, and, desc, eq, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/durable-sqlite";
 import { migrate } from "drizzle-orm/durable-sqlite/migrator";
 import migrations from "./migrations/migrations.js";
@@ -54,19 +54,25 @@ export class ScoreStorage extends DurableObject<Env> {
 		return await this.db.select().from(locations);
 	}
 
-	async getScoresByLocation(locationId: string): Promise<Score[]> {
+	async getScores({ locationId, gameDuration }: { locationId: string; gameDuration: number }): Promise<Score[]> {
 		return await this.db
 			.select()
 			.from(scores)
-			.where(eq(scores.locationId, locationId))
+			.where(and(
+				eq(scores.locationId, locationId),
+				eq(scores.gameDuration, gameDuration)
+			))
 			.orderBy(desc(scores.score));
 	}
 
-	async getHighestScore(locationId: string): Promise<number | null> {
+	async getHighestScore({ locationId, gameDuration }: { locationId: string; gameDuration: number }): Promise<number | null> {
 		const result = await this.db
 			.select({ maxScore: sql<number>`MAX(${scores.score})` })
 			.from(scores)
-			.where(eq(scores.locationId, locationId));
+			.where(and(
+				eq(scores.locationId, locationId),
+				eq(scores.gameDuration, gameDuration)
+			));
 		
 		return result[0]?.maxScore ?? null;
 	}
@@ -93,19 +99,21 @@ export class ScoreStorage extends DurableObject<Env> {
 		return result || null;
 	}
 
-	async updateSettings(locationId: string): Promise<Settings> {
+	async updateSettings(locationId: string, gameDuration: number = 30): Promise<Settings> {
 		// Use upsert (insert with onConflictDoUpdate) with excluded helper
 		const [upserted] = await this.db
 			.insert(settings)
 			.values({
 				id: "default",
 				locationId,
+				gameDuration,
 				updatedAt: new Date(),
 			})
 			.onConflictDoUpdate({
 				target: settings.id,
 				set: {
 					locationId: excluded(settings.locationId),
+					gameDuration: excluded(settings.gameDuration),
 					updatedAt: excluded(settings.updatedAt),
 				},
 			})

@@ -12,6 +12,9 @@ export const settings = sqliteTable("settings", {
 	locationId: text("location_id")
 		.notNull()
 		.references(() => locations.id),
+	gameDuration: integer("game_duration")
+		.notNull()
+		.default(30), // Default 30 seconds
 	updatedAt: integer("updated_at", { mode: "timestamp" })
 		.notNull()
 		.default(sql`(unixepoch())`),
@@ -30,6 +33,7 @@ export const scores = sqliteTable("scores", {
 	score: integer("score").notNull(),
 	combo: integer("combo").notNull(),
 	duration: integer("duration").notNull(), // in milliseconds
+	gameDuration: integer("game_duration").notNull().default(60), // game duration setting in seconds
 });
 
 export type Location = typeof locations.$inferSelect;

@@ -25,17 +25,21 @@ export async function loader({ context }: Route.LoaderArgs) {
 		return redirect("/settings");
 	}
 
-	// Get the highest score for the current location
-	const maxScore = await stub.getHighestScore(currentSettings.locationId);
+	// Get the highest score for the current location and game duration
+	const maxScore = await stub.getHighestScore({
+		locationId: currentSettings.locationId,
+		gameDuration: currentSettings.gameDuration
+	});
 
 	return {
 		maxScore,
 		locationId: currentSettings.locationId,
+		gameDuration: currentSettings.gameDuration,
 	};
 }
 
 export default function Home() {
-	const { maxScore } = useLoaderData<typeof loader>();
+	const { maxScore, gameDuration } = useLoaderData<typeof loader>();
 
 	return (
 		<div
@@ -49,9 +53,12 @@ export default function Home() {
 		>
 			{/* All Time Record Display */}
 			<div className="bg-neutral-800 rounded-lg px-48 py-12 border-4 border-white mb-16">
-				<h1 className="text-2xl text-white uppercase tracking-widest mb-6 text-center">
+				<h1 className="text-2xl text-white uppercase tracking-widest mb-2 text-center">
 					ALL TIME RECORD
 				</h1>
+				<p className="text-sm text-white/60 uppercase tracking-wider mb-6 text-center">
+					{gameDuration}s Challenge
+				</p>
 				<div className="text-9xl font-bold text-white text-center">
 					{maxScore !== null ? maxScore.toLocaleString() : "---"}
 				</div>

@@ -1,6 +1,6 @@
 import { parseWithZod } from "@conform-to/zod/v4";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, redirect, useFetcher } from "react-router";
+import { Link, redirect, useFetcher, useLoaderData } from "react-router";
 import { z } from "zod";
 import type { Route } from "./+types/game";
 
@@ -29,7 +29,10 @@ export async function loader({ context }: Route.LoaderArgs) {
 		return redirect("/settings");
 	}
 
-	return { locationId: currentSettings.locationId };
+	return { 
+		locationId: currentSettings.locationId,
+		gameDuration: currentSettings.gameDuration || 30
+	};
 }
 
 export async function action({ request, context }: Route.ActionArgs) {
@@ -52,7 +55,11 @@ export async function action({ request, context }: Route.ActionArgs) {
 	}
 
 	// Get the current highest score before adding the new one
-	const currentHighScore = await stub.getHighestScore(currentSettings.locationId);
+	const gameDuration = currentSettings.gameDuration || 30;
+	const currentHighScore = await stub.getHighestScore({
+		locationId: currentSettings.locationId,
+		gameDuration: gameDuration
+	});
 	const isNewHighScore = !currentHighScore || submission.value.score > currentHighScore;
 
 	// Add the score
@@ -61,6 +68,7 @@ export async function action({ request, context }: Route.ActionArgs) {
 		score: submission.value.score,
 		combo: submission.value.combo,
 		duration: submission.value.duration * 1000, // Convert to milliseconds
+		gameDuration: gameDuration, // Add the game duration setting
 	});
 
 	console.log("Score saved successfully:", {
@@ -91,11 +99,13 @@ interface ConnectedMessage {
 	message: string;
 }
 
-const GAME_DURATION = 60; // seconds
 const COUNTDOWN_DURATION = 3; // seconds
 const WEBSOCKET_URL = import.meta.env.VITE_WS_URL || "ws://localhost:8765";
 
 export default function Game() {
+	const { gameDuration } = useLoaderData<typeof loader>();
+	const GAME_DURATION = gameDuration || 30; // Use duration from settings
+	
 	const [gameStatus, setGameStatus] = useState<GameStatus>("ready");
 	const [score, setScore] = useState(0);
 	const [countdown, setCountdown] = useState(COUNTDOWN_DURATION);

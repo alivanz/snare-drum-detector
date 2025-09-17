@@ -12,6 +12,7 @@ import type { Route } from "./+types/settings";
 
 const settingsSchema = z.object({
 	locationId: z.string().min(1, "Please select a city"),
+	gameDuration: z.coerce.number().int().min(15).max(60).default(30),
 });
 
 export function meta({}: Route.MetaArgs) {
@@ -50,7 +51,10 @@ export async function action({ request, context }: Route.ActionArgs) {
 	const id = scoreStorage.idFromName("global");
 	const stub = scoreStorage.get(id);
 
-	await stub.updateSettings(submission.value.locationId);
+	await stub.updateSettings(
+		submission.value.locationId, 
+		submission.value.gameDuration
+	);
 
 	return submission.reply({ resetForm: true });
 }
@@ -64,6 +68,7 @@ export default function Settings() {
 		lastResult,
 		defaultValue: {
 			locationId: currentSettings?.locationId || "",
+			gameDuration: `${currentSettings?.gameDuration || 30}`,
 		},
 		onValidate({ formData }) {
 			return parseWithZod(formData, { schema: settingsSchema });
@@ -111,6 +116,29 @@ export default function Settings() {
 						{fields.locationId.errors && (
 							<p className="text-red-400 text-sm mt-2">
 								{fields.locationId.errors[0]}
+							</p>
+						)}
+					</div>
+
+					<div className="mb-8">
+						<label
+							htmlFor={fields.gameDuration.id}
+							className="block text-white/80 uppercase tracking-wider text-sm mb-4"
+						>
+							GAME DURATION
+						</label>
+						<select
+							{...getSelectProps(fields.gameDuration)}
+							className="w-full px-4 py-3 bg-black/50 border border-white/30 text-white rounded focus:outline-none focus:border-white/60"
+						>
+							<option value="15">15 seconds</option>
+							<option value="30">30 seconds</option>
+							<option value="45">45 seconds</option>
+							<option value="60">60 seconds</option>
+						</select>
+						{fields.gameDuration.errors && (
+							<p className="text-red-400 text-sm mt-2">
+								{fields.gameDuration.errors[0]}
 							</p>
 						)}
 					</div>

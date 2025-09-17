@@ -24,8 +24,11 @@ export async function loader({ context }: Route.LoaderArgs) {
 		return redirect("/settings");
 	}
 	
-	// Get scores for the current location (already sorted by score DESC from the Durable Object)
-	const scores = await stub.getScoresByLocation(settingsWithLocation.settings.locationId);
+	// Get scores for the current location and game duration (already sorted by score DESC from the Durable Object)
+	const scores = await stub.getScores({
+		locationId: settingsWithLocation.settings.locationId,
+		gameDuration: settingsWithLocation.settings.gameDuration
+	});
 	
 	// Add rank to each score
 	const rankedScores = scores.map((score, index) => ({
@@ -39,11 +42,12 @@ export async function loader({ context }: Route.LoaderArgs) {
 	return {
 		scores: rankedScores,
 		locationName: settingsWithLocation.location.name,
+		gameDuration: settingsWithLocation.settings.gameDuration,
 	};
 }
 
 export default function Leaderboard() {
-	const { scores, locationName } = useLoaderData<typeof loader>();
+	const { scores, locationName, gameDuration } = useLoaderData<typeof loader>();
 
 	// Format date and time in a human-readable way
 	const formatDateTime = (timestamp: string) => {
@@ -90,8 +94,11 @@ export default function Leaderboard() {
 				<h1 className="text-3xl text-white uppercase tracking-widest mb-2 text-center font-bold">
 					LEADERBOARD
 				</h1>
-				<p className="text-xl text-white/60 uppercase tracking-wider mb-8 text-center">
+				<p className="text-xl text-white/60 uppercase tracking-wider mb-2 text-center">
 					{locationName}
+				</p>
+				<p className="text-lg text-white/40 uppercase tracking-wider mb-8 text-center">
+					{gameDuration} Second Challenge
 				</p>
 
 				{scores.length === 0 ? (
