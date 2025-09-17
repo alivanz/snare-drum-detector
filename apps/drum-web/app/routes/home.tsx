@@ -65,28 +65,16 @@ export default function Home() {
 			</div>
 
 			{/* Start Challenge Button */}
-			<div
-				className="relative px-12 py-5 rounded-xl cursor-pointer hover:scale-105 transition-transform border-2 border-white"
-				style={{
-					background:
-						"linear-gradient(135deg, #8E8E8E 0%, #FFFFFF 22.1154%, #BCBCBC 39.4231%, #FFFFFF 70.6735%, #878787 96.1538%)",
-					filter: "drop-shadow(0px 3px 46px rgba(255, 255, 255, 0.35))",
-				}}
+			<Link
+				to="/game"
+				className="hover:scale-105 transition-transform"
 			>
-				<Link
-					to="/game"
-					className="relative text-3xl font-bold uppercase tracking-wider"
-					style={{
-						background: "linear-gradient(180deg, #000000 14.4311%, #141414 70.3631%)",
-						WebkitBackgroundClip: "text",
-						WebkitTextFillColor: "transparent",
-						backgroundClip: "text",
-						textShadow: "0 1px 0 rgba(255, 255, 255, 0.3)",
-					}}
-				>
-					START CHALLENGE
-				</Link>
-			</div>
+				<img 
+					src="/energi-besar.svg"
+					alt="START CHALLENGE"
+					className="h-20"
+				/>
+			</Link>
 		</div>
 	);
 }
