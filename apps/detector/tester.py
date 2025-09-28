@@ -7,6 +7,7 @@ import os
 from filters import bandpass_filter
 from audio_utils import downsample_audio, DownsampleMethod, signal_median
 from envelope import EnvelopeDecay
+from median import MedianFilter
 from hit_detector import HitDetector
 
 
@@ -75,7 +76,9 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     # Plot 1: Raw waveform with envelope
     envelope_detector_raw = EnvelopeDecay(decay_factor=decay_factor)
     envelope_raw = envelope_detector_raw.process_chunk(audio_data)
-    envelope_raw_median = signal_median(envelope_raw, median_window)
+    # envelope_raw_median = signal_median(envelope_raw, median_window)
+    median_filter_raw = MedianFilter(median_window)
+    envelope_raw_median = median_filter_raw.process_chunk(envelope_raw)
 
     # Apply hit detection to median-filtered envelope
     hit_detector_raw = HitDetector(threshold)
@@ -111,7 +114,9 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     filtered_audio = bandpass_filter(audio_data, sample_rate, lowcut=bandpass_low, highcut=bandpass_high)
     envelope_detector_filtered = EnvelopeDecay(decay_factor=decay_factor)
     envelope_filtered = envelope_detector_filtered.process_chunk(filtered_audio)
-    envelope_filtered_median = signal_median(envelope_filtered, median_window)
+    # envelope_filtered_median = signal_median(envelope_filtered, median_window)
+    median_filter_filtered = MedianFilter(median_window)
+    envelope_filtered_median = median_filter_filtered.process_chunk(envelope_filtered)
 
     # Apply hit detection to filtered median-filtered envelope
     hit_detector_filtered = HitDetector(threshold)
