@@ -6,6 +6,7 @@ from scipy import signal
 import os
 from filters import bandpass_filter
 from audio_utils import envelope_detector, downsample_audio, DownsampleMethod, signal_median
+from hit_detector import HitDetector
 
 
 def load_wav_file(filepath):
@@ -34,7 +35,7 @@ def load_wav_file(filepath):
     return sample_rate, audio_data
 
 
-def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, decay_factor=0.99, downsample_freq=None, bandpass_low=120, bandpass_high=250, median_window=1):
+def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, decay_factor=0.99, downsample_freq=None, bandpass_low=120, bandpass_high=250, median_window=1, threshold=0.2):
     """
     Plot audio signal visualization.
 
@@ -48,7 +49,12 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
         bandpass_low: Low cutoff frequency for bandpass filter (default: 120)
         bandpass_high: High cutoff frequency for bandpass filter (default: 250)
         median_window: Median filter window size for envelope smoothing (default: 1)
+        threshold: Hit detection threshold (default: 0.2)
     """
+    # Save original data for spectrogram (always show raw spectrogram)
+    original_audio_data = audio_data.copy()
+    original_sample_rate = sample_rate
+
     # Apply downsampling if requested
     if downsample_freq is not None and downsample_freq < sample_rate:
         print(f"Downsampling from {sample_rate} Hz to {downsample_freq} Hz...")
@@ -69,6 +75,17 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     envelope_raw = envelope_detector(audio_data, decay_factor=decay_factor)
     envelope_raw_median = signal_median(envelope_raw, median_window)
 
+    # Apply hit detection to median-filtered envelope
+    hit_detector_raw = HitDetector(threshold)
+    hit_detection_raw = hit_detector_raw.consume(envelope_raw_median)
+
+    # Add hit detection background coloring
+    for i in range(len(hit_detection_raw)):
+        if hit_detection_raw[i] == 1:
+            # Green background for hits
+            axes[0].axvspan(time_axis[max(0, i-1)], time_axis[min(len(time_axis)-1, i+1)],
+                           alpha=0.2, color='green', zorder=0)
+
     axes[0].plot(time_axis, audio_data, linewidth=0.5, alpha=0.7, color='blue', label='Signal')
     axes[0].plot(time_axis, envelope_raw, linewidth=1.5, color='red', alpha=0.6, label='Envelope')
     axes[0].plot(time_axis, -envelope_raw, linewidth=1.5, color='red', alpha=0.6)
@@ -76,6 +93,11 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     if median_window > 1:
         axes[0].plot(time_axis, envelope_raw_median, linewidth=2, color='orange', alpha=0.9, label=f'Median Envelope (N={median_window})')
         axes[0].plot(time_axis, -envelope_raw_median, linewidth=2, color='orange', alpha=0.9)
+
+    # Add hit detection indicator
+    hit_count_raw = np.sum(hit_detection_raw)
+    axes[0].text(0.02, 0.98, f'Hits: {hit_count_raw}', transform=axes[0].transAxes,
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     axes[0].set_ylabel('Amplitude')
     axes[0].set_title('Raw Waveform with Envelope')
     axes[0].grid(True, alpha=0.3)
@@ -88,6 +110,17 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     envelope_filtered = envelope_detector(filtered_audio, decay_factor=decay_factor)
     envelope_filtered_median = signal_median(envelope_filtered, median_window)
 
+    # Apply hit detection to filtered median-filtered envelope
+    hit_detector_filtered = HitDetector(threshold)
+    hit_detection_filtered = hit_detector_filtered.consume(envelope_filtered_median)
+
+    # Add hit detection background coloring
+    for i in range(len(hit_detection_filtered)):
+        if hit_detection_filtered[i] == 1:
+            # Green background for hits
+            axes[1].axvspan(time_axis[max(0, i-1)], time_axis[min(len(time_axis)-1, i+1)],
+                           alpha=0.2, color='green', zorder=0)
+
     axes[1].plot(time_axis, filtered_audio, linewidth=0.5, alpha=0.7, color='green', label='Filtered Signal')
     axes[1].plot(time_axis, envelope_filtered, linewidth=1.5, color='red', alpha=0.6, label='Envelope')
     axes[1].plot(time_axis, -envelope_filtered, linewidth=1.5, color='red', alpha=0.6)
@@ -95,6 +128,11 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     if median_window > 1:
         axes[1].plot(time_axis, envelope_filtered_median, linewidth=2, color='orange', alpha=0.9, label=f'Median Envelope (N={median_window})')
         axes[1].plot(time_axis, -envelope_filtered_median, linewidth=2, color='orange', alpha=0.9)
+
+    # Add hit detection indicator
+    hit_count_filtered = np.sum(hit_detection_filtered)
+    axes[1].text(0.02, 0.98, f'Hits: {hit_count_filtered}', transform=axes[1].transAxes,
+                verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     axes[1].set_ylabel('Amplitude')
     axes[1].set_title(f'Filtered Waveform ({bandpass_low}-{bandpass_high} Hz) with Envelope')
     axes[1].grid(True, alpha=0.3)
@@ -102,10 +140,11 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     axes[1].set_xlim([0, duration])
 
 
-    # Plot 3: Spectrogram
+    # Plot 3: Spectrogram (always use original raw data)
+    original_duration = len(original_audio_data) / original_sample_rate
     frequencies, times, spectrogram = signal.spectrogram(
-        audio_data,
-        fs=sample_rate,
+        original_audio_data,
+        fs=original_sample_rate,
         nperseg=1024,
         noverlap=512
     )
@@ -121,8 +160,8 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     )
     axes[2].set_ylabel('Frequency (Hz)')
     axes[2].set_xlabel('Time (s)')
-    axes[2].set_title('Spectrogram')
-    axes[2].set_xlim([0, duration])
+    axes[2].set_title('Spectrogram (Raw Audio)')
+    axes[2].set_xlim([0, original_duration])
 
     # Add horizontal lines for filter frequency range
     axes[2].axhline(y=bandpass_low, color='red', linestyle=':', alpha=0.5, label=f'Filter range ({bandpass_low}-{bandpass_high} Hz)')
@@ -153,6 +192,7 @@ def main():
   %(prog)s sample.wav --downsample 16000 # Downsample to 16kHz
   %(prog)s sample.wav --bandpass-low 80 --bandpass-high 300  # Custom filter range
   %(prog)s sample.wav --median 5         # Apply median smoothing (window size 5)
+  %(prog)s sample.wav --threshold 0.1    # Lower hit detection threshold
   %(prog)s sample.wav --save plot.png    # Save plot to file
   %(prog)s sample.wav -v                 # Verbose output"""
     )
@@ -168,6 +208,8 @@ def main():
                         help='Bandpass filter high cutoff frequency in Hz (default: 250)')
     parser.add_argument('--median', type=int, default=1,
                         help='Median filter window size for envelope smoothing (default: 1, no filtering)')
+    parser.add_argument('--threshold', type=float, default=0.2,
+                        help='Hit detection threshold (default: 0.2)')
     parser.add_argument('-s', '--save', type=str, default=None,
                         help='Save plot to file')
     parser.add_argument('-v', '--verbose', action='store_true',
@@ -214,6 +256,11 @@ def main():
             print(f"Error: Median window size must be positive (got {args.median})")
             return 1
 
+        # Validate threshold
+        if args.threshold <= 0:
+            print(f"Error: Threshold must be positive (got {args.threshold})")
+            return 1
+
         # Plot signal
         print("\nGenerating plot...")
         plot_title = f"{os.path.basename(args.wavfile)} - Audio Signal Analysis"
@@ -226,7 +273,8 @@ def main():
             downsample_freq=args.downsample,
             bandpass_low=args.bandpass_low,
             bandpass_high=args.bandpass_high,
-            median_window=args.median
+            median_window=args.median,
+            threshold=args.threshold
         )
 
     except FileNotFoundError as e:
