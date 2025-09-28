@@ -1,5 +1,6 @@
 import numpy as np
 from scipy import signal
+from scipy.ndimage import median_filter
 from enum import Enum
 
 
@@ -136,6 +137,31 @@ def downsample_audio(data: np.ndarray, orig_freq: float, target_freq: float, met
 
     else:
         raise ValueError(f"Method must be {DownsampleMethod.DECIMATE} or {DownsampleMethod.RESAMPLE}")
+
+
+def signal_median(data: np.ndarray, window_size: int = 1) -> np.ndarray:
+    """
+    Apply median filtering to signal data.
+
+    Args:
+        data: Input signal data
+        window_size: Median filter window size (default: 1, no filtering)
+
+    Returns:
+        Median filtered signal
+    """
+    if window_size <= 1:
+        return data.copy()
+
+    if len(data) == 0:
+        return np.array([])
+
+    # For small arrays, just return original if window is too large
+    if len(data) < window_size:
+        return data.copy()
+
+    # Apply 1D median filter
+    return median_filter(data, size=window_size, mode='reflect')
 
 
 def envelope_detector(audio_data: np.ndarray, decay_factor: float = 0.99) -> np.ndarray:
