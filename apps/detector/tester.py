@@ -5,7 +5,8 @@ from scipy.io import wavfile
 from scipy import signal
 import os
 from filters import bandpass_filter
-from audio_utils import envelope_detector, downsample_audio, DownsampleMethod, signal_median
+from audio_utils import downsample_audio, DownsampleMethod, signal_median
+from envelope import EnvelopeDecay
 from hit_detector import HitDetector
 
 
@@ -72,7 +73,8 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     fig.suptitle(title, fontsize=16)
 
     # Plot 1: Raw waveform with envelope
-    envelope_raw = envelope_detector(audio_data, decay_factor=decay_factor)
+    envelope_detector_raw = EnvelopeDecay(decay_factor=decay_factor)
+    envelope_raw = envelope_detector_raw.process_chunk(audio_data)
     envelope_raw_median = signal_median(envelope_raw, median_window)
 
     # Apply hit detection to median-filtered envelope
@@ -107,7 +109,8 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
 
     # Plot 2: Filtered waveform with envelope
     filtered_audio = bandpass_filter(audio_data, sample_rate, lowcut=bandpass_low, highcut=bandpass_high)
-    envelope_filtered = envelope_detector(filtered_audio, decay_factor=decay_factor)
+    envelope_detector_filtered = EnvelopeDecay(decay_factor=decay_factor)
+    envelope_filtered = envelope_detector_filtered.process_chunk(filtered_audio)
     envelope_filtered_median = signal_median(envelope_filtered, median_window)
 
     # Apply hit detection to filtered median-filtered envelope
