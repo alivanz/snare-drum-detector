@@ -53,3 +53,7 @@ class EnvelopeDecay:
             envelope[i] = self.envelope_value
 
         return envelope
+
+    def reset(self):
+        """Reset envelope detector state."""
+        self.envelope_value = 0.0
