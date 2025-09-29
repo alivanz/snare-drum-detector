@@ -5,7 +5,7 @@ Snare drum detector with streaming capabilities and structured output.
 from dataclasses import dataclass
 from typing import List, Optional
 import numpy as np
-from filters import bandpass_filter
+from bandpass import BandpassFilter
 from audio_utils import downsample_audio, DownsampleMethod
 from envelope import EnvelopeDecay
 from median import MedianFilter
@@ -58,6 +58,8 @@ class Detector:
         self.bandpass_high = bandpass_high
 
         # Initialize processing components
+        # Note: BandpassFilter will be initialized when we know the sample rate
+        self.bandpass_filter = None
         self.envelope_detector = EnvelopeDecay(decay_factor)
         self.median_filter = MedianFilter(median_window)
         self.hit_detector = HitDetector(threshold)
@@ -89,11 +91,15 @@ class Detector:
             audio_data = audio_data[:, 0]
 
         # Step 3: Apply bandpass filter
-        filtered_audio = bandpass_filter(
-            audio_data, sample_rate,
-            lowcut=self.bandpass_low,
-            highcut=self.bandpass_high
-        )
+        # Initialize filter on first use with actual sample rate
+        if self.bandpass_filter is None:
+            self.bandpass_filter = BandpassFilter(
+                sample_rate=sample_rate,
+                lowcut=self.bandpass_low,
+                highcut=self.bandpass_high
+            )
+
+        filtered_audio = self.bandpass_filter.process_chunk(audio_data)
 
         # Step 4: Envelope detection
         envelope = self.envelope_detector.process_chunk(filtered_audio)
@@ -136,6 +142,8 @@ class Detector:
 
     def reset(self):
         """Reset all internal state for new detection session."""
+        if self.bandpass_filter is not None:
+            self.bandpass_filter.reset()
         self.envelope_detector.reset()
         self.median_filter.reset()
         self.hit_detector = HitDetector(self.threshold)
