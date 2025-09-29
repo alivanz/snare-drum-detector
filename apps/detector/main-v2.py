@@ -159,7 +159,7 @@ async def handle_client(websocket, detector):
 
 async def websocket_audio_processor(device_index: Optional[int], detector):
     """Process audio in WebSocket mode."""
-    global websocket_running, hit_queue
+    global websocket_running, hit_queue, hit_count
 
     print(f"\\n🎧 Audio device: {device_index if device_index is not None else 'default'}")
 
@@ -169,28 +169,38 @@ async def websocket_audio_processor(device_index: Optional[int], detector):
                         callback=audio_callback,
                         blocksize=int(RATE * BLOCK_DURATION)):
 
+        print("🎤 Starting audio capture...")
+
         while True:
             try:
                 indata = q.get_nowait()
-                if websocket_running:
-                    # Process through detector
-                    result = detector.process_chunk(indata, RATE)
+                # Process through detector (always, regardless of websocket status)
+                result = detector.process_chunk(indata, RATE)
 
-                    # Send hit events to connected clients
-                    for i, hit_idx in enumerate(result.hit_indices):
-                        hit_count += 1
-                        hit_info = {
-                            "type": "hit",
-                            "timestamp": time.time(),
-                            "hit_number": hit_count,
-                            "envelope_value": float(result.envelope_median[hit_idx]),
-                            "threshold": detector.threshold
-                        }
-                        print(f"🥁 Hit #{hit_count} detected (envelope: {hit_info['envelope_value']:.3f})")
-                        await hit_queue.put(hit_info)
+                # Process hit events
+                for i, hit_idx in enumerate(result.hit_indices):
+                    hit_count += 1
+                    hit_info = {
+                        "type": "hit",
+                        "timestamp": time.time(),
+                        "hit_number": hit_count,
+                        "envelope_value": float(result.envelope_median[hit_idx]),
+                        "threshold": detector.threshold
+                    }
+                    print(f"🥁 Hit #{hit_count} detected (envelope: {hit_info['envelope_value']:.3f})")
+
+                    # Send to WebSocket clients only if any are connected
+                    if websocket_running:
+                        try:
+                            hit_queue.put_nowait(hit_info)
+                        except asyncio.QueueFull:
+                            pass  # Queue full, skip this hit
 
             except queue.Empty:
                 pass
+            except Exception as e:
+                print(f"❌ Unexpected error in audio loop: {e}")
+
             await asyncio.sleep(0.001)
 
 async def run_websocket_server(host: str, port: int, device_index: Optional[int], detector):
