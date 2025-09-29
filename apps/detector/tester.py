@@ -4,11 +4,8 @@ import matplotlib.pyplot as plt
 from scipy.io import wavfile
 from scipy import signal
 import os
-from filters import bandpass_filter
-from audio_utils import downsample_audio, DownsampleMethod, signal_median
-from envelope import EnvelopeDecay
-from median import MedianFilter
-from hit_detector import HitDetector
+from audio_utils import downsample_audio, DownsampleMethod
+from detector import Detector
 
 
 def load_wav_file(filepath):
@@ -35,58 +32,6 @@ def load_wav_file(filepath):
         audio_data = (audio_data.astype(np.float32) - 128) / 128.0
 
     return sample_rate, audio_data
-
-
-def process_audio_for_hits(audio_data, sample_rate, downsample_freq=None, bandpass_low=120,
-                           bandpass_high=250, decay_factor=0.99, median_window=1, threshold=0.2):
-    """
-    Process audio through detection pipeline and count hits.
-
-    Args:
-        audio_data: Audio samples
-        sample_rate: Sample rate in Hz
-        downsample_freq: Optional target frequency for downsampling
-        bandpass_low: Low cutoff frequency for bandpass filter
-        bandpass_high: High cutoff frequency for bandpass filter
-        decay_factor: Envelope decay factor
-        median_window: Median filter window size
-        threshold: Hit detection threshold
-
-    Returns:
-        Tuple of (hit_count, hit_detection_array, processed_sample_rate)
-    """
-    # Apply downsampling if requested
-    if downsample_freq is not None and downsample_freq < sample_rate:
-        audio_data, sample_rate = downsample_audio(
-            audio_data, sample_rate, downsample_freq, method=DownsampleMethod.DECIMATE
-        )
-
-    # Apply bandpass filter
-    filtered_audio = bandpass_filter(audio_data, sample_rate,
-                                    lowcut=bandpass_low,
-                                    highcut=bandpass_high)
-
-    # Envelope detection
-    envelope_detector = EnvelopeDecay(decay_factor=decay_factor)
-    envelope = envelope_detector.process_chunk(filtered_audio)
-
-    # Median filtering
-    median_filter = MedianFilter(median_window)
-    envelope_median = median_filter.process_chunk(envelope)
-
-    # Hit detection
-    hit_detector = HitDetector(threshold)
-    hit_detection = hit_detector.consume(envelope_median)
-
-    # Count edge detections (0->1 transitions)
-    hit_count = 0
-    prev_state = 0
-    for current_state in hit_detection:
-        if current_state == 1 and prev_state == 0:
-            hit_count += 1
-        prev_state = current_state
-
-    return hit_count, hit_detection, sample_rate
 
 
 def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, decay_factor=0.99, downsample_freq=None, bandpass_low=120, bandpass_high=250, median_window=1, threshold=0.2):
@@ -125,16 +70,21 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     fig, axes = plt.subplots(3, 1, figsize=(14, 10))
     fig.suptitle(title, fontsize=16)
 
-    # Plot 1: Raw waveform with envelope
-    envelope_detector_raw = EnvelopeDecay(decay_factor=decay_factor)
-    envelope_raw = envelope_detector_raw.process_chunk(audio_data)
-    # envelope_raw_median = signal_median(envelope_raw, median_window)
-    median_filter_raw = MedianFilter(median_window)
-    envelope_raw_median = median_filter_raw.process_chunk(envelope_raw)
+    # Plot 1: Raw waveform with envelope (using Detector class)
+    detector_raw = Detector(
+        decay_factor=decay_factor,
+        downsample_freq=None,  # No downsampling for raw
+        median_window=median_window,
+        threshold=threshold,
+        bandpass_low=1,  # Minimal filtering to avoid issues
+        bandpass_high=sample_rate/2 - 1  # Up to Nyquist
+    )
+    result_raw = detector_raw.process_chunk(audio_data, sample_rate)
 
-    # Apply hit detection to median-filtered envelope
-    hit_detector_raw = HitDetector(threshold)
-    hit_detection_raw = hit_detector_raw.consume(envelope_raw_median)
+    # Extract values from result
+    envelope_raw = result_raw.envelope
+    envelope_raw_median = result_raw.envelope_median
+    hit_detection_raw = result_raw.hit_detection
 
     # Add hit detection background coloring
     for i in range(len(hit_detection_raw)):
@@ -162,23 +112,23 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     axes[0].set_xlim([0, duration])
 
 
-    # Plot 2: Filtered waveform with envelope (use the reusable function)
-    hit_count_filtered, hit_detection_filtered, _ = process_audio_for_hits(
-        audio_data, sample_rate,
-        downsample_freq=None,  # Already downsampled above if needed
-        bandpass_low=bandpass_low,
-        bandpass_high=bandpass_high,
+    # Plot 2: Filtered waveform with envelope (using Detector class)
+    detector_filtered = Detector(
         decay_factor=decay_factor,
+        downsample_freq=None,  # Already downsampled above if needed
         median_window=median_window,
-        threshold=threshold
+        threshold=threshold,
+        bandpass_low=bandpass_low,
+        bandpass_high=bandpass_high
     )
+    result_filtered = detector_filtered.process_chunk(audio_data, sample_rate)
 
-    # Recreate intermediate values for plotting
-    filtered_audio = bandpass_filter(audio_data, sample_rate, lowcut=bandpass_low, highcut=bandpass_high)
-    envelope_detector_filtered = EnvelopeDecay(decay_factor=decay_factor)
-    envelope_filtered = envelope_detector_filtered.process_chunk(filtered_audio)
-    median_filter_filtered = MedianFilter(median_window)
-    envelope_filtered_median = median_filter_filtered.process_chunk(envelope_filtered)
+    # Extract values from result
+    filtered_audio = result_filtered.filtered_audio
+    envelope_filtered = result_filtered.envelope
+    envelope_filtered_median = result_filtered.envelope_median
+    hit_detection_filtered = result_filtered.hit_detection
+    hit_count_filtered = result_filtered.hit_count
 
     # Add hit detection background coloring
     for i in range(len(hit_detection_filtered)):
@@ -306,16 +256,17 @@ def main():
 
                 duration = len(audio_data) / sample_rate
 
-                # Process through detection pipeline
-                hit_count, _, _ = process_audio_for_hits(
-                    audio_data, sample_rate,
-                    downsample_freq=args.downsample,
-                    bandpass_low=args.bandpass_low,
-                    bandpass_high=args.bandpass_high,
+                # Process through detection pipeline using Detector class
+                detector = Detector(
                     decay_factor=args.decay,
+                    downsample_freq=args.downsample,
                     median_window=args.median,
-                    threshold=args.threshold
+                    threshold=args.threshold,
+                    bandpass_low=args.bandpass_low,
+                    bandpass_high=args.bandpass_high
                 )
+                result = detector.process_chunk(audio_data, sample_rate)
+                hit_count = result.hit_count
 
                 total_hits += hit_count
                 print(f"{wav_file}: {duration:.2f}s, {hit_count} hits")

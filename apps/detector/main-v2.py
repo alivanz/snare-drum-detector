@@ -7,12 +7,8 @@ import time
 import sys
 import websockets
 from typing import Set, Optional
-from filters import bandpass_filter
-from audio_utils import downsample_audio, DownsampleMethod
 import numpy as np
-from envelope import EnvelopeDecay
-from median import MedianFilter
-from hit_detector import HitDetector
+from detector import Detector
 
 # Parameters
 RATE = 48000
@@ -27,86 +23,7 @@ websocket_running = False
 hit_queue = asyncio.Queue()
 
 # Detection state
-previous_hit_state = 0
 hit_detector = None
-
-# =========================
-# Audio Detection Pipeline
-# =========================
-class DetectionPipeline:
-    def __init__(self, decay_factor=0.95, downsample_freq=16000, median_window=1,
-                 threshold=0.2, bandpass_low=80, bandpass_high=200):
-        self.decay_factor = decay_factor
-        self.downsample_freq = downsample_freq
-        self.median_window = median_window
-        self.threshold = threshold
-        self.bandpass_low = bandpass_low
-        self.bandpass_high = bandpass_high
-
-        # Initialize processing components
-        self.envelope_detector = EnvelopeDecay(decay_factor)
-        self.median_filter = MedianFilter(median_window)
-        self.hit_detector = HitDetector(threshold)
-        self.previous_hit_state = 0
-
-        print(f"Detection pipeline initialized:")
-        print(f"  Decay factor: {decay_factor}")
-        print(f"  Downsample: {RATE} -> {downsample_freq} Hz")
-        print(f"  Median window: {median_window}")
-        print(f"  Hit threshold: {threshold}")
-        print(f"  Bandpass: {bandpass_low}-{bandpass_high} Hz")
-
-    def process_audio_block(self, audio_data, sample_rate):
-        """Process audio block through the detection pipeline."""
-        global hit_count
-
-        # Step 1: Downsample if needed
-        if self.downsample_freq < sample_rate:
-            audio_data, actual_rate = downsample_audio(
-                audio_data, sample_rate, self.downsample_freq, method=DownsampleMethod.DECIMATE
-            )
-        else:
-            actual_rate = sample_rate
-
-        # Step 2: Extract single channel
-        if audio_data.ndim > 1:
-            audio_data = audio_data[:, 0]
-
-        # Step 3: Apply bandpass filter
-        filtered_audio = bandpass_filter(
-            audio_data, actual_rate,
-            lowcut=self.bandpass_low,
-            highcut=self.bandpass_high
-        )
-
-        # Step 4: Streaming envelope detection
-        envelope = self.envelope_detector.process_chunk(filtered_audio)
-
-        # Step 5: Streaming median filtering
-        envelope_median = self.median_filter.process_chunk(envelope)
-
-        # Step 6: Hit detection
-        hit_detection = self.hit_detector.consume(envelope_median)
-
-        # Step 7: Edge detection (0 -> 1 transitions)
-        hits_detected = []
-        for i, current_state in enumerate(hit_detection):
-            if current_state == 1 and self.previous_hit_state == 0:
-                # Rising edge detected - this is a hit!
-                hit_count += 1
-                hit_time = time.time()
-                hit_info = {
-                    "type": "hit",
-                    "timestamp": hit_time,
-                    "hit_number": hit_count,
-                    "envelope_value": float(envelope_median[i]) if i < len(envelope_median) else 0.0,
-                    "threshold": self.threshold
-                }
-                hits_detected.append(hit_info)
-
-            self.previous_hit_state = current_state
-
-        return hits_detected
 
 # =========================
 # Audio Callback
@@ -136,7 +53,7 @@ def list_devices():
 # =========================
 # WebSocket Server
 # =========================
-async def handle_client(websocket, detection_pipeline):
+async def handle_client(websocket, detector):
     """Handle a WebSocket client connection."""
     global connected_clients, websocket_running, hit_count, hit_queue
 
@@ -151,16 +68,17 @@ async def handle_client(websocket, detection_pipeline):
         except asyncio.QueueEmpty:
             break
 
+    config = detector.get_config()
     await websocket.send(json.dumps({
         "type": "connected",
         "timestamp": time.time(),
         "message": "Connected to snare drum detector v2",
         "pipeline_config": {
-            "decay_factor": detection_pipeline.decay_factor,
-            "downsample_freq": detection_pipeline.downsample_freq,
-            "median_window": detection_pipeline.median_window,
-            "threshold": detection_pipeline.threshold,
-            "bandpass_range": [detection_pipeline.bandpass_low, detection_pipeline.bandpass_high]
+            "decay_factor": config["decay_factor"],
+            "downsample_freq": config["downsample_freq"],
+            "median_window": config["median_window"],
+            "threshold": config["threshold"],
+            "bandpass_range": [config["bandpass_low"], config["bandpass_high"]]
         }
     }))
 
@@ -179,11 +97,8 @@ async def handle_client(websocket, detection_pipeline):
         if len(connected_clients) == 1 and not websocket_running:
             websocket_running = True
             hit_count = 0
-            # Reset detection pipeline state
-            detection_pipeline.envelope_detector.reset()
-            detection_pipeline.median_filter.reset()
-            detection_pipeline.hit_detector = HitDetector(detection_pipeline.threshold)
-            detection_pipeline.previous_hit_state = 0
+            # Reset detector state
+            detector.reset()
             print("🎤 Starting audio capture...")
 
         # Process messages from the queue
@@ -242,7 +157,7 @@ async def handle_client(websocket, detection_pipeline):
             websocket_running = False
             print("🛑 No clients connected, audio capture paused")
 
-async def websocket_audio_processor(device_index: Optional[int], detection_pipeline):
+async def websocket_audio_processor(device_index: Optional[int], detector):
     """Process audio in WebSocket mode."""
     global websocket_running, hit_queue
 
@@ -258,28 +173,36 @@ async def websocket_audio_processor(device_index: Optional[int], detection_pipel
             try:
                 indata = q.get_nowait()
                 if websocket_running:
-                    # Process through detection pipeline
-                    hits = detection_pipeline.process_audio_block(indata, RATE)
+                    # Process through detector
+                    result = detector.process_chunk(indata, RATE)
 
                     # Send hit events to connected clients
-                    for hit_info in hits:
-                        print(f"🥁 Hit #{hit_info['hit_number']} detected (envelope: {hit_info['envelope_value']:.3f})")
+                    for i, hit_idx in enumerate(result.hit_indices):
+                        hit_count += 1
+                        hit_info = {
+                            "type": "hit",
+                            "timestamp": time.time(),
+                            "hit_number": hit_count,
+                            "envelope_value": float(result.envelope_median[hit_idx]),
+                            "threshold": detector.threshold
+                        }
+                        print(f"🥁 Hit #{hit_count} detected (envelope: {hit_info['envelope_value']:.3f})")
                         await hit_queue.put(hit_info)
 
             except queue.Empty:
                 pass
             await asyncio.sleep(0.001)
 
-async def run_websocket_server(host: str, port: int, device_index: Optional[int], detection_pipeline):
+async def run_websocket_server(host: str, port: int, device_index: Optional[int], detector):
     """Run the WebSocket server."""
     print(f"\\n🌐 Starting WebSocket server on {host}:{port}")
     print(f"📡 Clients can connect to ws://{host}:{port}")
     print("Press Ctrl+C to stop the server\\n")
 
-    audio_task = asyncio.create_task(websocket_audio_processor(device_index, detection_pipeline))
+    audio_task = asyncio.create_task(websocket_audio_processor(device_index, detector))
 
     async def client_handler(websocket):
-        await handle_client(websocket, detection_pipeline)
+        await handle_client(websocket, detector)
 
     async with websockets.serve(client_handler, host, port):
         try:
@@ -373,8 +296,8 @@ def main():
         print(f"Error: Low cutoff ({args.bandpass_low} Hz) must be less than high cutoff ({args.bandpass_high} Hz)")
         sys.exit(1)
 
-    # Create detection pipeline
-    detection_pipeline = DetectionPipeline(
+    # Create detector
+    detector = Detector(
         decay_factor=args.decay,
         downsample_freq=args.downsample,
         median_window=args.median,
@@ -383,13 +306,20 @@ def main():
         bandpass_high=args.bandpass_high
     )
 
+    print(f"Detection pipeline initialized:")
+    print(f"  Decay factor: {args.decay}")
+    print(f"  Downsample: {RATE} -> {args.downsample} Hz")
+    print(f"  Median window: {args.median}")
+    print(f"  Hit threshold: {args.threshold}")
+    print(f"  Bandpass: {args.bandpass_low}-{args.bandpass_high} Hz")
+
     # Start WebSocket server
     try:
         asyncio.run(run_websocket_server(
             host=args.host,
             port=args.port,
             device_index=args.device,
-            detection_pipeline=detection_pipeline
+            detector=detector
         ))
     except KeyboardInterrupt:
         print("\\n⚠️  WebSocket server stopped by user")

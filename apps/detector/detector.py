@@ -1,275 +1,155 @@
+"""
+Snare drum detector with streaming capabilities and structured output.
+"""
+
+from dataclasses import dataclass
+from typing import List, Optional
 import numpy as np
-import time
-from typing import Optional, Dict, Any
 from filters import bandpass_filter
-from audio_utils import calculate_rms, calculate_energy, extract_channel, validate_audio_format
+from audio_utils import downsample_audio, DownsampleMethod
+from envelope import EnvelopeDecay
+from median import MedianFilter
+from hit_detector import HitDetector
+
+
+@dataclass
+class DetectionResult:
+    """Result from detection pipeline with all intermediate values."""
+    hit_count: int                          # Number of hits detected (0->1 transitions)
+    hit_indices: List[int]                  # Sample indices where hits occurred
+    hit_detection: np.ndarray               # Binary array of detection states
+    envelope: np.ndarray                    # Envelope values
+    envelope_median: np.ndarray             # Median-filtered envelope
+    filtered_audio: np.ndarray              # Bandpass filtered audio
+    sample_rate: float                      # Processed sample rate (after downsampling)
+    hit_times: List[float]                  # Relative timestamps for each hit (in seconds)
 
 
 class Detector:
-    def __init__(
-        self,
-        threshold: float = 0.2,
-        peak_threshold: float = 0.4,
-        sample_rate: int = 48000,
-        channels: int = 1,
-        block_duration: float = 0.05,
-        min_hit_interval: float = 0.15
-    ):
+    """
+    Streaming snare drum detector with state management.
+
+    Maintains state between audio chunks for real-time processing.
+    """
+
+    def __init__(self,
+                 decay_factor: float = 0.95,
+                 downsample_freq: Optional[int] = 16000,
+                 median_window: int = 1,
+                 threshold: float = 0.2,
+                 bandpass_low: float = 80,
+                 bandpass_high: float = 200):
         """
-        Initialize the Detector with configurable parameters.
+        Initialize detector with processing parameters.
 
         Args:
-            threshold: RMS threshold for hit detection
-            peak_threshold: Peak threshold to filter out bleed
-            sample_rate: Audio sample rate in Hz
-            channels: Number of audio channels
-            block_duration: Duration of audio blocks in seconds
-            min_hit_interval: Minimum time between hits to avoid double-counting
+            decay_factor: Envelope decay factor (0 < decay < 1)
+            downsample_freq: Target downsample frequency in Hz (None = no downsampling)
+            median_window: Median filter window size (1 = no filtering)
+            threshold: Hit detection threshold
+            bandpass_low: Bandpass filter low cutoff in Hz
+            bandpass_high: Bandpass filter high cutoff in Hz
         """
+        self.decay_factor = decay_factor
+        self.downsample_freq = downsample_freq
+        self.median_window = median_window
         self.threshold = threshold
-        self.peak_threshold = peak_threshold
-        self.sample_rate = sample_rate
-        self.channels = channels
-        self.block_duration = block_duration
-        self.min_hit_interval = min_hit_interval
+        self.bandpass_low = bandpass_low
+        self.bandpass_high = bandpass_high
 
-        # Bandpass filter parameters
-        self.lowcut = 120
-        self.highcut = 250
-        self.filter_order = 4
+        # Initialize processing components
+        self.envelope_detector = EnvelopeDecay(decay_factor)
+        self.median_filter = MedianFilter(median_window)
+        self.hit_detector = HitDetector(threshold)
 
-        # State variables
-        self.hit_count = 0
-        self.last_hit_time = 0
-        self.total_rms = 0
-        self.total_blocks = 0
-        self.hit_timestamps = []
+        # State for edge detection
+        self.previous_hit_state = 0
+        self.cumulative_samples = 0  # Track total samples processed for timing
 
-    def apply_bandpass_filter(self, data: np.ndarray) -> np.ndarray:
+    def process_chunk(self, audio_data: np.ndarray, sample_rate: float) -> DetectionResult:
         """
-        Apply bandpass filter with detector's configured parameters.
+        Process an audio chunk through the detection pipeline.
 
         Args:
-            data: Input audio data
+            audio_data: Audio samples (can be multi-channel)
+            sample_rate: Sample rate in Hz
 
         Returns:
-            Filtered audio data
+            DetectionResult with hits and intermediate values
         """
-        return bandpass_filter(
-            data,
-            self.sample_rate,
-            self.lowcut,
-            self.highcut,
-            self.filter_order
+        # Step 1: Downsample if needed
+        if self.downsample_freq and self.downsample_freq < sample_rate:
+            audio_data, sample_rate = downsample_audio(
+                audio_data, sample_rate, self.downsample_freq,
+                method=DownsampleMethod.DECIMATE
+            )
+
+        # Step 2: Extract single channel if multi-channel
+        if audio_data.ndim > 1:
+            audio_data = audio_data[:, 0]
+
+        # Step 3: Apply bandpass filter
+        filtered_audio = bandpass_filter(
+            audio_data, sample_rate,
+            lowcut=self.bandpass_low,
+            highcut=self.bandpass_high
         )
 
-    def detect_hit(self, audio_data: np.ndarray) -> bool:
-        """
-        Simple hit detection that returns True/False.
+        # Step 4: Envelope detection
+        envelope = self.envelope_detector.process_chunk(filtered_audio)
 
-        Args:
-            audio_data: Input audio data
+        # Step 5: Median filtering
+        envelope_median = self.median_filter.process_chunk(envelope)
 
-        Returns:
-            True if hit detected, False otherwise
-        """
-        # Extract single channel if multi-channel
-        channel_data = extract_channel(audio_data)
+        # Step 6: Hit detection
+        hit_detection = self.hit_detector.consume(envelope_median)
 
-        # Apply bandpass filter
-        filtered = self.apply_bandpass_filter(channel_data)
+        # Step 7: Edge detection (0->1 transitions)
+        hit_indices = []
+        hit_times = []
+        hit_count = 0
 
-        # Calculate RMS
-        rms = calculate_rms(filtered)
+        for i, current_state in enumerate(hit_detection):
+            if current_state == 1 and self.previous_hit_state == 0:
+                # Rising edge detected - this is a hit!
+                hit_count += 1
+                hit_indices.append(i)
+                # Calculate time relative to start of this chunk
+                hit_time = (self.cumulative_samples + i) / sample_rate
+                hit_times.append(hit_time)
 
-        # Check threshold and timing
-        now = time.time()
-        if rms > self.threshold and (now - self.last_hit_time) > self.min_hit_interval:
-            self.last_hit_time = now
-            self.hit_count += 1
-            self.hit_timestamps.append(now)
-            return True
-        return False
+            self.previous_hit_state = current_state
 
-    def detect_hit_detailed(self, audio_data: np.ndarray) -> Optional[Dict[str, Any]]:
-        """
-        Detailed hit detection with metadata.
+        # Update cumulative samples for next chunk
+        self.cumulative_samples += len(audio_data)
 
-        Args:
-            audio_data: Input audio data
+        return DetectionResult(
+            hit_count=hit_count,
+            hit_indices=hit_indices,
+            hit_detection=hit_detection,
+            envelope=envelope,
+            envelope_median=envelope_median,
+            filtered_audio=filtered_audio,
+            sample_rate=sample_rate,
+            hit_times=hit_times
+        )
 
-        Returns:
-            Dictionary with hit details if detected, None otherwise
-        """
-        # Extract single channel if multi-channel
-        channel_data = extract_channel(audio_data)
+    def reset(self):
+        """Reset all internal state for new detection session."""
+        self.envelope_detector.reset()
+        self.median_filter.reset()
+        self.hit_detector = HitDetector(self.threshold)
+        self.previous_hit_state = 0
+        self.cumulative_samples = 0
 
-        # Apply bandpass filter
-        filtered = self.apply_bandpass_filter(channel_data)
-
-        # Calculate RMS
-        rms = calculate_rms(filtered)
-
-        # Update statistics
-        self.total_rms += rms
-        self.total_blocks += 1
-
-        # Check threshold and timing
-        now = time.time()
-        if rms > self.threshold and (now - self.last_hit_time) > self.min_hit_interval:
-            self.last_hit_time = now
-            self.hit_count += 1
-            self.hit_timestamps.append(now)
-
-            return {
-                "type": "hit",
-                "timestamp": now,
-                "hit_number": self.hit_count,
-                "rms_value": float(rms),
-                "threshold": float(self.threshold),
-                "peak_value": float(np.max(np.abs(filtered))),
-                "frequency_range": (self.lowcut, self.highcut)
-            }
-        return None
-
-    def calculate_energy(self, audio_data: np.ndarray) -> float:
-        """
-        Calculate energy/RMS of audio block.
-
-        Args:
-            audio_data: Input audio data
-
-        Returns:
-            Energy value (RMS squared)
-        """
-        channel_data = extract_channel(audio_data)
-        return calculate_energy(channel_data)
-
-    def reset_state(self) -> None:
-        """Reset hit counter and timing variables."""
-        self.hit_count = 0
-        self.last_hit_time = 0
-        self.total_rms = 0
-        self.total_blocks = 0
-        self.hit_timestamps = []
-
-    def get_hit_count(self) -> int:
-        """Return current hit count."""
-        return self.hit_count
-
-    def get_last_hit_time(self) -> float:
-        """Return timestamp of last detected hit."""
-        return self.last_hit_time
-
-    def set_threshold(self, threshold: float) -> None:
-        """
-        Update detection threshold.
-
-        Args:
-            threshold: New RMS threshold value
-        """
-        if threshold <= 0:
-            raise ValueError("Threshold must be positive")
-        self.threshold = threshold
-
-    def set_bandpass_params(self, lowcut: float, highcut: float) -> None:
-        """
-        Update bandpass filter frequency range.
-
-        Args:
-            lowcut: Low frequency cutoff in Hz
-            highcut: High frequency cutoff in Hz
-        """
-        if lowcut <= 0 or highcut <= 0:
-            raise ValueError("Frequency values must be positive")
-        if lowcut >= highcut:
-            raise ValueError("Low cutoff must be less than high cutoff")
-        if highcut > self.sample_rate / 2:
-            raise ValueError("High cutoff must be less than Nyquist frequency")
-
-        self.lowcut = lowcut
-        self.highcut = highcut
-
-    def get_config(self) -> Dict[str, Any]:
-        """
-        Return current detector configuration.
-
-        Returns:
-            Dictionary with all configuration parameters
-        """
+    def get_config(self) -> dict:
+        """Get current detector configuration."""
         return {
+            "decay_factor": self.decay_factor,
+            "downsample_freq": self.downsample_freq,
+            "median_window": self.median_window,
             "threshold": self.threshold,
-            "peak_threshold": self.peak_threshold,
-            "sample_rate": self.sample_rate,
-            "channels": self.channels,
-            "block_duration": self.block_duration,
-            "min_hit_interval": self.min_hit_interval,
-            "lowcut": self.lowcut,
-            "highcut": self.highcut,
-            "filter_order": self.filter_order
+            "bandpass_low": self.bandpass_low,
+            "bandpass_high": self.bandpass_high
         }
-
-    def process_audio_block(self, audio_data: np.ndarray) -> Dict[str, Any]:
-        """
-        Process a single audio block and return results.
-
-        Args:
-            audio_data: Input audio data
-
-        Returns:
-            Dictionary with processing results
-        """
-        # Validate audio format
-        if not validate_audio_format(audio_data, self.channels):
-            return {
-                "type": "error",
-                "message": "Invalid audio format"
-            }
-
-        # Check for hit
-        hit_info = self.detect_hit_detailed(audio_data)
-
-        # Calculate energy
-        energy = self.calculate_energy(audio_data)
-
-        # Build result
-        result = {
-            "type": "processed",
-            "timestamp": time.time(),
-            "energy": energy,
-            "hit_detected": hit_info is not None
-        }
-
-        if hit_info:
-            result["hit_info"] = hit_info
-
-        return result
-
-
-    def get_statistics(self) -> Dict[str, Any]:
-        """
-        Return detection statistics.
-
-        Returns:
-            Dictionary with statistics
-        """
-        stats = {
-            "total_hits": self.hit_count,
-            "total_blocks_processed": self.total_blocks,
-            "average_rms": 0,
-            "hit_rate": 0,
-            "last_hit_time": self.last_hit_time,
-            "hit_timestamps": self.hit_timestamps
-        }
-
-        if self.total_blocks > 0:
-            stats["average_rms"] = self.total_rms / self.total_blocks
-
-        # Calculate hit rate (hits per second)
-        if len(self.hit_timestamps) > 1:
-            time_span = self.hit_timestamps[-1] - self.hit_timestamps[0]
-            if time_span > 0:
-                stats["hit_rate"] = (len(self.hit_timestamps) - 1) / time_span
-
-        return stats
 
