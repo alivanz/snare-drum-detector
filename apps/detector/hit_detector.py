@@ -8,7 +8,7 @@ class HitDetector:
     
     def consume(self, data: np.ndarray):
         out = np.zeros_like(data)
-        for i in range(1, len(data)):
+        for i in range(len(data)):  # Start at 0, not 1
             v = data[i]
             state = 0
             if v < self.offset:
@@ -17,7 +17,7 @@ class HitDetector:
             elif v > self.offset + self.threshold:
                 state = 1
                 self.offset = v - self.threshold
-            
+
             if self.high:
                 if state == -1:
                     out[i] = 0
@@ -30,5 +30,5 @@ class HitDetector:
                     self.high = True
                 else:
                     out[i] = 0
-        
+
         return out

@@ -34,7 +34,7 @@ def load_wav_file(filepath):
     return sample_rate, audio_data
 
 
-def process_audio_in_chunks(audio_data, sample_rate, chunk_secs, detector, verbose=False):
+def process_audio_in_chunks(audio_data, sample_rate, chunk_secs, detector, verbose=False, label=""):
     """
     Process audio in chunks using a streaming detector.
 
@@ -53,7 +53,7 @@ def process_audio_in_chunks(audio_data, sample_rate, chunk_secs, detector, verbo
     num_chunks = (total_samples + chunk_size - 1) // chunk_size  # Ceiling division
 
     if verbose:
-        print(f"Processing {total_samples} samples in {num_chunks} chunks of {chunk_secs}s ({chunk_size} samples)")
+        print(f"{label}Processing {total_samples} samples in {num_chunks} chunks of {chunk_secs}s ({chunk_size} samples)")
 
     # Accumulate results
     total_hit_count = 0
@@ -71,7 +71,7 @@ def process_audio_in_chunks(audio_data, sample_rate, chunk_secs, detector, verbo
         chunk = audio_data[start_idx:end_idx]
 
         if verbose:
-            print(f"  Chunk {i+1}/{num_chunks}: samples {start_idx}-{end_idx} ({len(chunk)} samples)")
+            print(f"  {label}Chunk {i+1}/{num_chunks}: samples {start_idx}-{end_idx} ({len(chunk)} samples)")
 
         # Process chunk
         result = detector.process_chunk(chunk, sample_rate)
@@ -92,11 +92,11 @@ def process_audio_in_chunks(audio_data, sample_rate, chunk_secs, detector, verbo
         all_envelope_median.extend(result.envelope_median)
         all_filtered_audio.extend(result.filtered_audio)
 
-        if verbose and chunk_hits > 0:
-            print(f"    → {chunk_hits} hits detected in this chunk")
+        if verbose:
+            print(f"    {label}→ {chunk_hits} hits detected in this chunk")
 
     if verbose:
-        print(f"Total hits across all chunks: {total_hit_count}")
+        print(f"{label}Total hits across all chunks: {total_hit_count}")
 
     # Create combined result
     return DetectionResult(
@@ -160,7 +160,9 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     if chunk_secs:
         if verbose:
             print("\nProcessing raw audio in chunks...")
-        result_raw = process_audio_in_chunks(audio_data, sample_rate, chunk_secs, detector_raw, verbose)
+        result_raw = process_audio_in_chunks(audio_data, sample_rate, chunk_secs, detector_raw, verbose, "[RAW] ")
+        if verbose:
+            print(f"Raw processing found {result_raw.hit_count} hits")
     else:
         result_raw = detector_raw.process_chunk(audio_data, sample_rate)
 
@@ -185,7 +187,7 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
         axes[0].plot(time_axis, -envelope_raw_median, linewidth=2, color='orange', alpha=0.9)
 
     # Add hit detection indicator
-    hit_count_raw = np.sum(hit_detection_raw)
+    hit_count_raw = result_raw.hit_count  # Use actual edge detection count
     axes[0].text(0.02, 0.98, f'Hits: {hit_count_raw}', transform=axes[0].transAxes,
                 verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     axes[0].set_ylabel('Amplitude')
@@ -208,7 +210,9 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     if chunk_secs:
         if verbose:
             print("\nProcessing filtered audio in chunks...")
-        result_filtered = process_audio_in_chunks(audio_data, sample_rate, chunk_secs, detector_filtered, verbose)
+        result_filtered = process_audio_in_chunks(audio_data, sample_rate, chunk_secs, detector_filtered, verbose, "[FILTERED] ")
+        if verbose:
+            print(f"Filtered processing found {result_filtered.hit_count} hits")
     else:
         result_filtered = detector_filtered.process_chunk(audio_data, sample_rate)
 
