@@ -10,6 +10,7 @@ from audio_utils import downsample_audio, DownsampleMethod
 from envelope import EnvelopeDecay
 from median import MedianFilter
 from hit_detector import HitDetector
+from edge_detector import EdgeDetector
 
 
 @dataclass
@@ -63,9 +64,9 @@ class Detector:
         self.envelope_detector = EnvelopeDecay(decay_factor)
         self.median_filter = MedianFilter(median_window)
         self.hit_detector = HitDetector(threshold)
+        self.edge_detector = EdgeDetector()
 
-        # State for edge detection
-        self.previous_hit_state = 0
+        # State for timing
         self.cumulative_samples = 0  # Track total samples processed for timing
 
     def process_chunk(self, audio_data: np.ndarray, sample_rate: float) -> DetectionResult:
@@ -111,20 +112,11 @@ class Detector:
         hit_detection = self.hit_detector.consume(envelope_median)
 
         # Step 7: Edge detection (0->1 transitions)
-        hit_indices = []
-        hit_times = []
-        hit_count = 0
+        hit_indices = self.edge_detector.process_chunk(hit_detection)
+        hit_count = len(hit_indices)
 
-        for i, current_state in enumerate(hit_detection):
-            if current_state == 1 and self.previous_hit_state == 0:
-                # Rising edge detected - this is a hit!
-                hit_count += 1
-                hit_indices.append(i)
-                # Calculate time relative to start of this chunk
-                hit_time = (self.cumulative_samples + i) / sample_rate
-                hit_times.append(hit_time)
-
-            self.previous_hit_state = current_state
+        # Calculate hit times
+        hit_times = [(self.cumulative_samples + i) / sample_rate for i in hit_indices]
 
         # Update cumulative samples for next chunk
         self.cumulative_samples += len(audio_data)
@@ -147,7 +139,7 @@ class Detector:
         self.envelope_detector.reset()
         self.median_filter.reset()
         self.hit_detector = HitDetector(self.threshold)
-        self.previous_hit_state = 0
+        self.edge_detector.reset()
         self.cumulative_samples = 0
 
     def get_config(self) -> dict:
