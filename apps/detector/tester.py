@@ -5,7 +5,7 @@ from scipy.io import wavfile
 from scipy import signal
 import os
 from audio_utils import downsample_audio, DownsampleMethod
-from detector import Detector
+from detector import Detector, DetectionResult
 
 
 def load_wav_file(filepath):
@@ -34,7 +34,84 @@ def load_wav_file(filepath):
     return sample_rate, audio_data
 
 
-def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, decay_factor=0.99, downsample_freq=None, bandpass_low=120, bandpass_high=250, median_window=1, threshold=0.2):
+def process_audio_in_chunks(audio_data, sample_rate, chunk_secs, detector, verbose=False):
+    """
+    Process audio in chunks using a streaming detector.
+
+    Args:
+        audio_data: Audio samples
+        sample_rate: Sample rate in Hz
+        chunk_secs: Duration of each chunk in seconds
+        detector: Detector instance to use
+        verbose: Print chunk-by-chunk information
+
+    Returns:
+        Combined DetectionResult from all chunks
+    """
+    chunk_size = int(chunk_secs * sample_rate)
+    total_samples = len(audio_data)
+    num_chunks = (total_samples + chunk_size - 1) // chunk_size  # Ceiling division
+
+    if verbose:
+        print(f"Processing {total_samples} samples in {num_chunks} chunks of {chunk_secs}s ({chunk_size} samples)")
+
+    # Accumulate results
+    total_hit_count = 0
+    all_hit_indices = []
+    all_hit_detection = []
+    all_envelope = []
+    all_envelope_median = []
+    all_filtered_audio = []
+    all_hit_times = []
+    processed_sample_rate = sample_rate
+
+    for i in range(num_chunks):
+        start_idx = i * chunk_size
+        end_idx = min(start_idx + chunk_size, total_samples)
+        chunk = audio_data[start_idx:end_idx]
+
+        if verbose:
+            print(f"  Chunk {i+1}/{num_chunks}: samples {start_idx}-{end_idx} ({len(chunk)} samples)")
+
+        # Process chunk
+        result = detector.process_chunk(chunk, sample_rate)
+        processed_sample_rate = result.sample_rate  # Update with potentially downsampled rate
+
+        # Accumulate results
+        chunk_hits = result.hit_count
+        total_hit_count += chunk_hits
+
+        # Adjust indices to global position
+        global_hit_indices = [idx + len(all_hit_detection) for idx in result.hit_indices]
+        all_hit_indices.extend(global_hit_indices)
+        all_hit_times.extend(result.hit_times)
+
+        # Concatenate arrays
+        all_hit_detection.extend(result.hit_detection)
+        all_envelope.extend(result.envelope)
+        all_envelope_median.extend(result.envelope_median)
+        all_filtered_audio.extend(result.filtered_audio)
+
+        if verbose and chunk_hits > 0:
+            print(f"    → {chunk_hits} hits detected in this chunk")
+
+    if verbose:
+        print(f"Total hits across all chunks: {total_hit_count}")
+
+    # Create combined result
+    return DetectionResult(
+        hit_count=total_hit_count,
+        hit_indices=all_hit_indices,
+        hit_detection=np.array(all_hit_detection),
+        envelope=np.array(all_envelope),
+        envelope_median=np.array(all_envelope_median),
+        filtered_audio=np.array(all_filtered_audio),
+        sample_rate=processed_sample_rate,
+        hit_times=all_hit_times
+    )
+
+
+def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, decay_factor=0.99, downsample_freq=None, bandpass_low=120, bandpass_high=250, median_window=1, threshold=0.2, chunk_secs=None, verbose=False):
     """
     Plot audio signal visualization.
 
@@ -79,7 +156,13 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
         bandpass_low=1,  # Minimal filtering to avoid issues
         bandpass_high=sample_rate/2 - 1  # Up to Nyquist
     )
-    result_raw = detector_raw.process_chunk(audio_data, sample_rate)
+
+    if chunk_secs:
+        if verbose:
+            print("\nProcessing raw audio in chunks...")
+        result_raw = process_audio_in_chunks(audio_data, sample_rate, chunk_secs, detector_raw, verbose)
+    else:
+        result_raw = detector_raw.process_chunk(audio_data, sample_rate)
 
     # Extract values from result
     envelope_raw = result_raw.envelope
@@ -121,7 +204,13 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
         bandpass_low=bandpass_low,
         bandpass_high=bandpass_high
     )
-    result_filtered = detector_filtered.process_chunk(audio_data, sample_rate)
+
+    if chunk_secs:
+        if verbose:
+            print("\nProcessing filtered audio in chunks...")
+        result_filtered = process_audio_in_chunks(audio_data, sample_rate, chunk_secs, detector_filtered, verbose)
+    else:
+        result_filtered = detector_filtered.process_chunk(audio_data, sample_rate)
 
     # Extract values from result
     filtered_audio = result_filtered.filtered_audio
@@ -210,6 +299,7 @@ def main():
   %(prog)s sample.wav --median 5         # Apply median smoothing (window size 5)
   %(prog)s sample.wav --threshold 0.1    # Lower hit detection threshold
   %(prog)s sample.wav --save plot.png    # Save plot to file
+  %(prog)s sample.wav --chunk-secs 0.05  # Test streaming with 50ms chunks
   %(prog)s sample.wav -v                 # Verbose output"""
     )
 
@@ -228,6 +318,8 @@ def main():
                         help='Hit detection threshold (default: 0.2)')
     parser.add_argument('-s', '--save', type=str, default=None,
                         help='Save plot to file')
+    parser.add_argument('--chunk-secs', type=float, default=None,
+                        help='Process audio in chunks of specified duration (seconds) for streaming test')
     parser.add_argument('-v', '--verbose', action='store_true',
                         help='Verbose output')
 
@@ -265,7 +357,14 @@ def main():
                     bandpass_low=args.bandpass_low,
                     bandpass_high=args.bandpass_high
                 )
-                result = detector.process_chunk(audio_data, sample_rate)
+
+                if args.chunk_secs:
+                    if args.verbose:
+                        print(f"  Processing {wav_file} in chunks of {args.chunk_secs}s...")
+                    result = process_audio_in_chunks(audio_data, sample_rate, args.chunk_secs, detector, args.verbose)
+                else:
+                    result = detector.process_chunk(audio_data, sample_rate)
+
                 hit_count = result.hit_count
 
                 total_hits += hit_count
@@ -323,7 +422,11 @@ def main():
             return 1
 
         # Plot signal
-        print("\nGenerating plot...")
+        if args.chunk_secs:
+            print(f"\nGenerating plot with chunked processing ({args.chunk_secs}s chunks)...")
+        else:
+            print("\nGenerating plot...")
+
         plot_title = f"{os.path.basename(args.path)} - Audio Signal Analysis"
         plot_signal(
             audio_data,
@@ -335,7 +438,9 @@ def main():
             bandpass_low=args.bandpass_low,
             bandpass_high=args.bandpass_high,
             median_window=args.median,
-            threshold=args.threshold
+            threshold=args.threshold,
+            chunk_secs=args.chunk_secs,
+            verbose=args.verbose
         )
 
     except FileNotFoundError as e:
