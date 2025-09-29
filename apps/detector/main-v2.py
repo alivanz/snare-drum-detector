@@ -241,18 +241,18 @@ def main():
                         help='Enable verbose output')
 
     # Detection pipeline parameters
-    parser.add_argument('--decay', type=float, default=0.95,
-                        help='Envelope decay factor (default: 0.95)')
-    parser.add_argument('--downsample', type=int, default=16000,
-                        help='Downsample target frequency in Hz (default: 16000)')
-    parser.add_argument('--median', type=int, default=1,
-                        help='Median filter window size (default: 1)')
-    parser.add_argument('--threshold', type=float, default=0.2,
-                        help='Hit detection threshold (default: 0.2)')
-    parser.add_argument('--bandpass-low', type=float, default=80,
-                        help='Bandpass filter low cutoff frequency in Hz (default: 80)')
-    parser.add_argument('--bandpass-high', type=float, default=200,
-                        help='Bandpass filter high cutoff frequency in Hz (default: 200)')
+    parser.add_argument('--decay', type=float, default=0.98,
+                        help='Envelope decay factor (default: 0.98)')
+    parser.add_argument('--downsample', type=int, default=2000,
+                        help='Downsample target frequency in Hz (default: 2000)')
+    parser.add_argument('--median', type=int, default=5,
+                        help='Median filter window size (default: 5)')
+    parser.add_argument('--threshold', type=float, default=0.1,
+                        help='Hit detection threshold (default: 0.1)')
+    parser.add_argument('--bandpass-low', type=float, default=140,
+                        help='Bandpass filter low cutoff frequency in Hz (default: 140)')
+    parser.add_argument('--bandpass-high', type=float, default=180,
+                        help='Bandpass filter high cutoff frequency in Hz (default: 180)')
 
     args = parser.parse_args()
 
