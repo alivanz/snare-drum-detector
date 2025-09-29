@@ -278,7 +278,7 @@ async def run_websocket_server(host: str, port: int, device_index: Optional[int]
 
     audio_task = asyncio.create_task(websocket_audio_processor(device_index, detection_pipeline))
 
-    async def client_handler(websocket, path):
+    async def client_handler(websocket):
         await handle_client(websocket, detection_pipeline)
 
     async with websockets.serve(client_handler, host, port):
