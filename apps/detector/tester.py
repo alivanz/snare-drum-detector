@@ -37,6 +37,58 @@ def load_wav_file(filepath):
     return sample_rate, audio_data
 
 
+def process_audio_for_hits(audio_data, sample_rate, downsample_freq=None, bandpass_low=120,
+                           bandpass_high=250, decay_factor=0.99, median_window=1, threshold=0.2):
+    """
+    Process audio through detection pipeline and count hits.
+
+    Args:
+        audio_data: Audio samples
+        sample_rate: Sample rate in Hz
+        downsample_freq: Optional target frequency for downsampling
+        bandpass_low: Low cutoff frequency for bandpass filter
+        bandpass_high: High cutoff frequency for bandpass filter
+        decay_factor: Envelope decay factor
+        median_window: Median filter window size
+        threshold: Hit detection threshold
+
+    Returns:
+        Tuple of (hit_count, hit_detection_array, processed_sample_rate)
+    """
+    # Apply downsampling if requested
+    if downsample_freq is not None and downsample_freq < sample_rate:
+        audio_data, sample_rate = downsample_audio(
+            audio_data, sample_rate, downsample_freq, method=DownsampleMethod.DECIMATE
+        )
+
+    # Apply bandpass filter
+    filtered_audio = bandpass_filter(audio_data, sample_rate,
+                                    lowcut=bandpass_low,
+                                    highcut=bandpass_high)
+
+    # Envelope detection
+    envelope_detector = EnvelopeDecay(decay_factor=decay_factor)
+    envelope = envelope_detector.process_chunk(filtered_audio)
+
+    # Median filtering
+    median_filter = MedianFilter(median_window)
+    envelope_median = median_filter.process_chunk(envelope)
+
+    # Hit detection
+    hit_detector = HitDetector(threshold)
+    hit_detection = hit_detector.consume(envelope_median)
+
+    # Count edge detections (0->1 transitions)
+    hit_count = 0
+    prev_state = 0
+    for current_state in hit_detection:
+        if current_state == 1 and prev_state == 0:
+            hit_count += 1
+        prev_state = current_state
+
+    return hit_count, hit_detection, sample_rate
+
+
 def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, decay_factor=0.99, downsample_freq=None, bandpass_low=120, bandpass_high=250, median_window=1, threshold=0.2):
     """
     Plot audio signal visualization.
@@ -110,17 +162,23 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
     axes[0].set_xlim([0, duration])
 
 
-    # Plot 2: Filtered waveform with envelope
+    # Plot 2: Filtered waveform with envelope (use the reusable function)
+    hit_count_filtered, hit_detection_filtered, _ = process_audio_for_hits(
+        audio_data, sample_rate,
+        downsample_freq=None,  # Already downsampled above if needed
+        bandpass_low=bandpass_low,
+        bandpass_high=bandpass_high,
+        decay_factor=decay_factor,
+        median_window=median_window,
+        threshold=threshold
+    )
+
+    # Recreate intermediate values for plotting
     filtered_audio = bandpass_filter(audio_data, sample_rate, lowcut=bandpass_low, highcut=bandpass_high)
     envelope_detector_filtered = EnvelopeDecay(decay_factor=decay_factor)
     envelope_filtered = envelope_detector_filtered.process_chunk(filtered_audio)
-    # envelope_filtered_median = signal_median(envelope_filtered, median_window)
     median_filter_filtered = MedianFilter(median_window)
     envelope_filtered_median = median_filter_filtered.process_chunk(envelope_filtered)
-
-    # Apply hit detection to filtered median-filtered envelope
-    hit_detector_filtered = HitDetector(threshold)
-    hit_detection_filtered = hit_detector_filtered.consume(envelope_filtered_median)
 
     # Add hit detection background coloring
     for i in range(len(hit_detection_filtered)):
@@ -137,8 +195,7 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
         axes[1].plot(time_axis, envelope_filtered_median, linewidth=2, color='orange', alpha=0.9, label=f'Median Envelope (N={median_window})')
         axes[1].plot(time_axis, -envelope_filtered_median, linewidth=2, color='orange', alpha=0.9)
 
-    # Add hit detection indicator
-    hit_count_filtered = np.sum(hit_detection_filtered)
+    # Add hit detection indicator (already calculated)
     axes[1].text(0.02, 0.98, f'Hits: {hit_count_filtered}', transform=axes[1].transAxes,
                 verticalalignment='top', bbox=dict(boxstyle='round', facecolor='white', alpha=0.8))
     axes[1].set_ylabel('Amplitude')
@@ -192,10 +249,11 @@ def plot_signal(audio_data, sample_rate, title="Audio Signal", save_path=None, d
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Visualize WAV file audio signal",
+        description="Visualize WAV file audio signal or process directory of WAV files",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""Examples:
   %(prog)s sample.wav                    # Visualize sample.wav
+  %(prog)s ./samples/                    # Process all WAV files in directory
   %(prog)s sample.wav --decay 0.95       # Use faster decay (0.95)
   %(prog)s sample.wav --downsample 16000 # Downsample to 16kHz
   %(prog)s sample.wav --bandpass-low 80 --bandpass-high 300  # Custom filter range
@@ -205,7 +263,7 @@ def main():
   %(prog)s sample.wav -v                 # Verbose output"""
     )
 
-    parser.add_argument('wavfile', help='Path to WAV file')
+    parser.add_argument('path', help='Path to WAV file or directory containing WAV files')
     parser.add_argument('-d', '--decay', type=float, default=0.99,
                         help='Envelope decay factor (default: 0.99)')
     parser.add_argument('--downsample', type=int, default=None,
@@ -225,10 +283,54 @@ def main():
 
     args = parser.parse_args()
 
+    # Check if path is directory or file
+    if os.path.isdir(args.path):
+        # Process directory
+        print(f"Processing directory: {args.path}")
+        wav_files = [f for f in os.listdir(args.path) if f.lower().endswith('.wav')]
+
+        if not wav_files:
+            print("No WAV files found in directory")
+            return 1
+
+        total_hits = 0
+        for wav_file in sorted(wav_files):
+            filepath = os.path.join(args.path, wav_file)
+            try:
+                # Load and process file
+                sample_rate, audio_data = load_wav_file(filepath)
+
+                # Handle multi-channel
+                if len(audio_data.shape) > 1:
+                    audio_data = audio_data[:, 0]
+
+                duration = len(audio_data) / sample_rate
+
+                # Process through detection pipeline
+                hit_count, _, _ = process_audio_for_hits(
+                    audio_data, sample_rate,
+                    downsample_freq=args.downsample,
+                    bandpass_low=args.bandpass_low,
+                    bandpass_high=args.bandpass_high,
+                    decay_factor=args.decay,
+                    median_window=args.median,
+                    threshold=args.threshold
+                )
+
+                total_hits += hit_count
+                print(f"{wav_file}: {duration:.2f}s, {hit_count} hits")
+
+            except Exception as e:
+                print(f"Error processing {wav_file}: {e}")
+
+        print(f"\nTotal: {len(wav_files)} files, {total_hits} hits")
+        return 0
+
+    # Single file processing (existing code)
     try:
         # Load WAV file
-        print(f"Loading: {args.wavfile}")
-        sample_rate, audio_data = load_wav_file(args.wavfile)
+        print(f"Loading: {args.path}")
+        sample_rate, audio_data = load_wav_file(args.path)
 
         # Handle multi-channel audio
         if len(audio_data.shape) > 1:
@@ -271,7 +373,7 @@ def main():
 
         # Plot signal
         print("\nGenerating plot...")
-        plot_title = f"{os.path.basename(args.wavfile)} - Audio Signal Analysis"
+        plot_title = f"{os.path.basename(args.path)} - Audio Signal Analysis"
         plot_signal(
             audio_data,
             sample_rate,
