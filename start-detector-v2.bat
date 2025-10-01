@@ -8,7 +8,7 @@ cd /d "%~dp0apps\detector"
 
 REM Run python with explicit environment activation
 echo Starting WebSocket server...
-micromamba run -n drum python -u main-v2.py
+micromamba run -n drum python -u main-v2.py --threshold 0.05
 
 echo.
 echo Detector stopped.
